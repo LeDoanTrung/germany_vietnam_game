@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, defineAsyncComponent, ref } from "vue";
+import { computed, defineAsyncComponent, ref, watch } from "vue";
 import AppHeader from "../components/AppHeader.vue";
 import HoloPanel from "../components/HoloPanel.vue";
 import ScrambleText from "../components/ScrambleText.vue";
@@ -9,10 +9,14 @@ import RouteMap from "../components/RouteMap.vue";
 import InfoRow from "../components/InfoRow.vue";
 import ActionBar from "../components/ActionBar.vue";
 import GameButton from "../components/GameButton.vue";
-import { formatVnd } from "../config/game";
+import { DELIVERY, formatVnd } from "../config/game";
+import { ROUTE, type LatLng } from "../config/route";
 import { statusSentence } from "../config/status";
 import { claimOf, statusOf, useGame } from "../store/game";
 import { sounds } from "../composables/useSound";
+import { useGeolocation } from "../composables/useGeolocation";
+import { useWakeLock } from "../composables/useWakeLock";
+import { distanceMeters, formatDistance, isWithinDelivery } from "../utils/geo";
 
 // The real map pulls in Leaflet, so it only loads once someone is actually riding.
 const LiveMap = defineAsyncComponent(() => import("../components/LiveMap.vue"));
@@ -20,7 +24,7 @@ const LiveMap = defineAsyncComponent(() => import("../components/LiveMap.vue"));
 // One frame for the whole order, as the client described it: "Accept order"
 // takes it (nobody else can afterwards) and shows where to wait; then the ride,
 // and "Confirm delivered" opens the congrats pop-up.
-const { state, currentOrder, myOrder, earnings, back, acceptOrder, confirmDelivered, openOrder } = useGame();
+const { state, currentOrder, myOrder, earnings, back, acceptOrder, confirmDelivered, openOrder, showNotice } = useGame();
 
 const status = computed(() => (currentOrder.value ? statusOf(currentOrder.value.id) : "available"));
 const claim = computed(() => (currentOrder.value ? claimOf(currentOrder.value.id) : undefined));
@@ -40,7 +44,75 @@ const handleAccept = () => {
   void acceptOrder();
 };
 
+// ---- Delivery gate ---------------------------------------------------------
+// "Confirm delivered" only unlocks near the destination. If GPS can't help
+// (location off, no signal, bad indoor fix) the organiser can unlock it with a code.
+
+const { position, accuracy, status: gpsStatus, start: startGps, resumeIfAllowed } = useGeolocation();
+const { request: keepScreenOn } = useWakeLock();
+
+const isRiding = computed(() => isMine.value && status.value === "delivering");
+
+// Pick GPS back up on its own when the player already allowed it (e.g. after a reload).
+watch(
+  isRiding,
+  (riding) => {
+    if (riding) void resumeIfAllowed();
+  },
+  { immediate: true },
+);
+
+const destination = ROUTE.destination.coords as LatLng;
+const distanceLeft = computed(() => (position.value ? distanceMeters(position.value, destination) : null));
+const nearDestination = computed(
+  () => !!position.value && isWithinDelivery(position.value, accuracy.value, destination, DELIVERY.radiusMeters),
+);
+
+watch(nearDestination, (near, before) => {
+  if (near && !before && isRiding.value) sounds.success();
+});
+
+// Unlocked by the organiser code, remembered per order so a reload keeps it.
+const unlockKey = computed(() => `shipper-game:unlocked:${currentOrder.value?.id}`);
+const readUnlocked = () => {
+  try {
+    return localStorage.getItem(unlockKey.value) === "1";
+  } catch {
+    return false;
+  }
+};
+const organiserUnlocked = ref(readUnlocked());
+watch(unlockKey, () => (organiserUnlocked.value = readUnlocked()));
+
+const canConfirm = computed(() => nearDestination.value || organiserUnlocked.value);
+
+const showCodeForm = ref(false);
+const codeInput = ref("");
+
+const submitCode = () => {
+  if (codeInput.value.trim().toUpperCase() !== DELIVERY.unlockCode.toUpperCase()) {
+    sounds.tap();
+    showNotice("That code isn't right — ask the organiser again.");
+    return;
+  }
+  sounds.confirm();
+  organiserUnlocked.value = true;
+  showCodeForm.value = false;
+  try {
+    localStorage.setItem(unlockKey.value, "1");
+  } catch {
+    // Not persisted — they'd need the code again after a reload.
+  }
+};
+
+const handleTurnOnLocation = () => {
+  sounds.tap();
+  startGps();
+  keepScreenOn();
+};
+
 const handleDelivered = () => {
+  if (!canConfirm.value) return;
   sounds.success();
   void confirmDelivered();
 };
@@ -125,21 +197,67 @@ const setMapView = (view: "live" | "animated") => {
         </GameButton>
       </template>
 
-      <!-- My order, on the way -->
-      <GameButton
-        v-else-if="status === 'delivering' && isMine"
-        variant="success"
-        block
-        :disabled="state.busy"
-        :tap-sound="false"
-        @click="handleDelivered"
-      >
-        <svg class="order-button-icon" viewBox="0 0 24 24" aria-hidden="true">
-          <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2.2" />
-          <path d="m7.8 12.3 2.9 2.9 5.5-6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" />
-        </svg>
-        Confirm delivered
-      </GameButton>
+      <!-- My order, on the way: locked until the rider reaches the destination -->
+      <template v-else-if="isRiding">
+        <div v-if="!canConfirm" class="order-gate-status" aria-live="polite">
+          <template v-if="gpsStatus === 'tracking' && distanceLeft !== null">
+            🔒 Get within {{ DELIVERY.radiusMeters }} m of {{ currentOrder.to.name }} to confirm —
+            <b>{{ formatDistance(distanceLeft) }} away</b>
+          </template>
+          <template v-else-if="gpsStatus === 'requesting'">📍 Finding your location… allow it when your phone asks.</template>
+          <template v-else-if="gpsStatus === 'denied'">
+            📍 Location is off. Turn it on in your browser settings, or ask the organiser for the unlock code.
+          </template>
+          <template v-else-if="gpsStatus === 'unavailable'">
+            📍 No GPS signal. Move into the open, or ask the organiser for the unlock code.
+          </template>
+          <template v-else>🔒 "Confirm delivered" unlocks when you reach {{ currentOrder.to.name }}.</template>
+        </div>
+
+        <GameButton v-if="gpsStatus === 'idle' && !canConfirm" block @click="handleTurnOnLocation">
+          📍 Turn on location
+        </GameButton>
+
+        <GameButton
+          variant="success"
+          block
+          :disabled="state.busy || !canConfirm"
+          :tap-sound="false"
+          @click="handleDelivered"
+        >
+          <svg class="order-button-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <template v-if="canConfirm">
+              <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2.2" />
+              <path d="m7.8 12.3 2.9 2.9 5.5-6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" />
+            </template>
+            <template v-else>
+              <rect x="5" y="11" width="14" height="10" rx="2" fill="none" stroke="currentColor" stroke-width="2.2" />
+              <path d="M8 11V8a4 4 0 0 1 8 0v3" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" />
+            </template>
+          </svg>
+          Confirm delivered
+        </GameButton>
+
+        <!-- Organiser override -->
+        <template v-if="!canConfirm">
+          <form v-if="showCodeForm" class="order-code" @submit.prevent="submitCode">
+            <input
+              v-model="codeInput"
+              class="order-code-input"
+              type="text"
+              inputmode="text"
+              autocapitalize="characters"
+              autocomplete="off"
+              placeholder="Organiser code"
+              aria-label="Organiser unlock code"
+            />
+            <GameButton type="submit" variant="ghost">Unlock</GameButton>
+          </form>
+          <button v-else type="button" class="order-code-link" @click="showCodeForm = true">
+            Can't get a GPS fix? Enter the organiser code
+          </button>
+        </template>
+      </template>
 
       <!-- Someone else's order, or finished -->
       <template v-else>
@@ -290,6 +408,57 @@ const setMapView = (view: "live" | "animated") => {
         color: #001a2e;
       }
     }
+  }
+
+  // Why "Confirm delivered" is still locked, and how far is left.
+  &-gate-status {
+    padding: 10px 14px;
+    border-radius: var(--radius-sm);
+    border-left: 3px solid var(--color-amber-400);
+    background: rgba(10, 30, 66, 0.92);
+    font-size: 14px;
+    color: var(--color-text-100);
+
+    b {
+      color: var(--color-amber-300);
+      white-space: nowrap;
+    }
+  }
+
+  &-code {
+    display: flex;
+    gap: var(--space-xs);
+
+    &-input {
+      flex: 1;
+      min-width: 0;
+      min-height: 48px;
+      padding: 10px 14px;
+      border: 1px solid rgba(52, 191, 255, 0.5);
+      border-radius: var(--radius-pill);
+      background: rgba(2, 10, 28, 0.85);
+      color: var(--color-text-100);
+      font-family: var(--font-mono);
+      // 16px+ stops iOS Safari zooming in when the field is focused.
+      font-size: 16px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+
+      &:focus {
+        outline: none;
+        border-color: var(--color-amber-400);
+      }
+    }
+  }
+
+  &-code-link {
+    min-height: 36px;
+    border: none;
+    background: none;
+    color: var(--color-text-300);
+    font-size: 13px;
+    text-decoration: underline;
+    cursor: pointer;
   }
 
   &-hint {

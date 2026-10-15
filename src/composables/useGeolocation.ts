@@ -4,42 +4,67 @@ import type { LatLng } from "../config/route";
 export type GeoStatus = "idle" | "requesting" | "tracking" | "denied" | "unavailable";
 
 // Live position from the phone's GPS. Nothing leaves the device.
+//
+// Shared by every component that asks for it (the order screen gates
+// "Confirm delivered" on it; the live map draws it), so there is one GPS watch
+// however many components are listening. It stops when the last one unmounts.
+
+const position = ref<LatLng | null>(null);
+/** Accuracy radius in metres, as reported by the phone. */
+const accuracy = ref<number | null>(null);
+const status = ref<GeoStatus>("idle");
+
+let watchId: number | null = null;
+let consumers = 0;
+
+const start = () => {
+  if (!("geolocation" in navigator)) {
+    status.value = "unavailable";
+    return;
+  }
+  if (watchId !== null) return;
+  status.value = "requesting";
+
+  watchId = navigator.geolocation.watchPosition(
+    (result) => {
+      position.value = [result.coords.latitude, result.coords.longitude];
+      accuracy.value = result.coords.accuracy;
+      status.value = "tracking";
+    },
+    (error) => {
+      if (error.code === error.PERMISSION_DENIED) status.value = "denied";
+      // A timeout mid-ride (tunnel, tall buildings) keeps the last known spot.
+      else if (!position.value) status.value = "unavailable";
+    },
+    { enableHighAccuracy: true, maximumAge: 5000, timeout: 20000 },
+  );
+};
+
+const stop = () => {
+  if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+  watchId = null;
+  // Forget the last fix: an old position must not count as "near the destination".
+  position.value = null;
+  accuracy.value = null;
+  if (status.value === "tracking" || status.value === "requesting") status.value = "idle";
+};
+
+/** Starts tracking without a tap if the player already allowed location before. */
+const resumeIfAllowed = async () => {
+  try {
+    const permission = await navigator.permissions?.query({ name: "geolocation" });
+    if (permission?.state === "granted") start();
+  } catch {
+    // Permissions API missing (older iOS): wait for the player to tap.
+  }
+};
+
 export const useGeolocation = () => {
-  const position = ref<LatLng | null>(null);
-  /** Accuracy radius in metres, as reported by the phone. */
-  const accuracy = ref<number | null>(null);
-  const status = ref<GeoStatus>("idle");
-  let watchId: number | null = null;
+  consumers++;
+  onBeforeUnmount(() => {
+    consumers--;
+    if (consumers === 0) stop();
+  });
 
-  const start = () => {
-    if (!("geolocation" in navigator)) {
-      status.value = "unavailable";
-      return;
-    }
-    if (watchId !== null) return;
-    status.value = "requesting";
-
-    watchId = navigator.geolocation.watchPosition(
-      (result) => {
-        position.value = [result.coords.latitude, result.coords.longitude];
-        accuracy.value = result.coords.accuracy;
-        status.value = "tracking";
-      },
-      (error) => {
-        if (error.code === error.PERMISSION_DENIED) status.value = "denied";
-        // A timeout mid-ride (tunnel, tall buildings) keeps the last known spot.
-        else if (!position.value) status.value = "unavailable";
-      },
-      { enableHighAccuracy: true, maximumAge: 5000, timeout: 20000 },
-    );
-  };
-
-  const stop = () => {
-    if (watchId !== null) navigator.geolocation.clearWatch(watchId);
-    watchId = null;
-  };
-
-  onBeforeUnmount(stop);
-
-  return { position, accuracy, status, start, stop };
+  return { position, accuracy, status, start, resumeIfAllowed };
 };

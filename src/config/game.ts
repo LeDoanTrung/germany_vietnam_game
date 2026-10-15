@@ -34,6 +34,20 @@ export const GAME = {
   appName: "Shipper App",
 };
 
+export const DELIVERY = {
+  /**
+   * "Confirm delivered" unlocks within this distance of the destination.
+   * Generous on purpose: indoors, phone GPS is often off by tens of metres.
+   */
+  radiusMeters: 100,
+  /**
+   * Organiser override, for a phone with location off or bad GPS: the
+   * organiser reads this out and the player types it in. It ships in the page,
+   * so it stops casual skipping, not a determined player. Change it before the event.
+   */
+  unlockCode: "KLU2026",
+};
+
 /**
  * One order per person in the group. Players pick an order themselves (or use
  * the random draw); once someone takes an order nobody else can.

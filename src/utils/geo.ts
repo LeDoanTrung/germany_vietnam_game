@@ -38,5 +38,13 @@ export const remainingAlongPath = (path: LatLng[], position: LatLng) => {
 export const distanceToPath = (path: LatLng[], position: LatLng) =>
   path.reduce((closest, point) => Math.min(closest, distanceMeters(point, position)), Infinity);
 
+/**
+ * Close enough to the destination to deliver. The phone's own accuracy
+ * estimate is added (capped) so a rider standing at the door with a fuzzy
+ * indoor fix still counts.
+ */
+export const isWithinDelivery = (position: LatLng, accuracy: number | null, destination: LatLng, radius: number) =>
+  distanceMeters(position, destination) <= radius + Math.min(accuracy ?? 0, 50);
+
 export const formatDistance = (meters: number) =>
   meters < 1000 ? `${Math.round(meters / 10) * 10} m` : `${(meters / 1000).toFixed(1)} km`;

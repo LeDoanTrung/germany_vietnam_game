@@ -19,4 +19,9 @@ export const FIREBASE_CONFIG = {
  */
 export const ROUND_ID = "phd-workshop-2026";
 
-export const firebaseEnabled = Boolean(FIREBASE_CONFIG.apiKey && FIREBASE_CONFIG.projectId);
+/**
+ * `VITE_FORCE_LOCAL=1 npm run dev` runs the game in local mode even though
+ * Firebase is configured, so testing on a laptop doesn't take real orders.
+ */
+export const firebaseEnabled =
+  Boolean(FIREBASE_CONFIG.apiKey && FIREBASE_CONFIG.projectId) && import.meta.env.VITE_FORCE_LOCAL !== "1";

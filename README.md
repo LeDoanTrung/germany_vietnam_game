@@ -11,8 +11,10 @@ GitHub Pages. The only backend is Firebase, which keeps the order list in sync s
    everyone else, and each player can only take one. The order then shows where to wait: **Gate 1, 2 or 3** of
    HCMC University of Technology, with the status *"Dispatching shipper [name]"*.
 4. Ride to the destination. The **live map** shows the route and, if location is allowed, the player's position and
-   the distance left. GPS is just for fun: it never blocks the game.
-5. Tap **Confirm delivered** → **Congratulations!**
+   the distance left.
+5. **Confirm delivered** stays locked until the player is within 100 m of the destination (plus the phone's own GPS
+   accuracy, capped at 50 m, for fuzzy indoor fixes). If a phone can't get a fix or location is off, the organiser reads
+   out the **unlock code** and the player enters it under the button. Then → **Congratulations!**
 
 ## Run locally
 
@@ -21,11 +23,15 @@ npm install
 npm run dev          # http://localhost:3100
 npm run build        # typecheck + production build into dist/
 npm run test:rules   # check firestore.rules on the Firestore emulator (needs Java)
+npm run test:firebase  # race two anonymous "phones" on the real project (smoke-test round)
+VITE_FORCE_LOCAL=1 npm run dev   # play locally without taking real orders in Firebase
 ```
 
 ## Editing content
 
-- `src/config/game.ts`: title, banner, subtitle, number of orders (`ORDER_COUNT`), gates and parcels.
+- `src/config/game.ts`: title, banner, subtitle, number of orders (`ORDER_COUNT`), gates and parcels, and `DELIVERY`:
+  the unlock radius and the **organiser unlock code** (currently `KLU2026`, change it before the event). The code ships
+  in the page, so it stops casual skipping rather than a determined player; GPS can be faked on a phone anyway.
 - `src/config/route-waypoints.json`: start, destination and optional `via` stops of the ride, as
   `[latitude, longitude]` (Google Maps: long-press a spot to copy). After editing, run `npm run route` to regenerate
   `src/config/route-path.json`. The street path is precomputed, so the game never calls a routing API.

@@ -5,12 +5,13 @@ import "leaflet/dist/leaflet.css";
 import { ROUTE, type LatLng } from "../config/route";
 import { useGeolocation } from "../composables/useGeolocation";
 import { useWakeLock } from "../composables/useWakeLock";
-import { formatDistance, remainingAlongPath, distanceMeters, distanceToPath } from "../utils/geo";
+import { formatDistance, remainingAlongPath, distanceMeters, distanceToPath, isWithinDelivery } from "../utils/geo";
+import { DELIVERY } from "../config/game";
 import { sounds } from "../composables/useSound";
 
-// Real map of the ride, with the player's live GPS position. GPS is "just for
-// fun" (client decision): it never blocks the game, and if location is denied
-// the planned route still shows.
+// Real map of the ride, with the player's live GPS position. The order screen
+// uses the same position to unlock "Confirm delivered" near the destination;
+// this component only draws it.
 //
 // The tour operator decides the actual route on the day, so the planned route
 // is only a faint suggestion: the line that matters is the trail of where the
@@ -22,8 +23,6 @@ import { sounds } from "../composables/useSound";
 
 const props = defineProps<{ gate: number; orderId: string }>();
 
-/** Within this distance of the destination counts as "arrived". */
-const ARRIVED_RADIUS_M = 60;
 /** Further than this from the planned route counts as a different route. */
 const OFF_ROUTE_M = 80;
 /** Ignore fixes worse than this — indoors or between tall buildings GPS jumps around. */
@@ -143,13 +142,12 @@ const remaining = computed(() => {
     ? distanceMeters(position.value, ROUTE.destination.coords as LatLng)
     : remainingAlongPath(ROUTE.path, position.value);
 });
+// Same test as the "Confirm delivered" button, so the map and the button agree.
 const arrived = computed(
-  () => !!position.value && distanceMeters(position.value, ROUTE.destination.coords as LatLng) <= ARRIVED_RADIUS_M,
+  () =>
+    !!position.value &&
+    isWithinDelivery(position.value, accuracy.value, ROUTE.destination.coords as LatLng, DELIVERY.radiusMeters),
 );
-
-watch(arrived, (now, before) => {
-  if (now && !before) sounds.success();
-});
 
 const handleLocate = () => {
   sounds.tap();
@@ -189,7 +187,7 @@ const recenter = () => {
     <figcaption class="live-map-info">
       <template v-if="arrived">
         <span class="live-map-info-main live-map-info-arrived">You've arrived! 🎉</span>
-        <span class="live-map-info-sub">Confirm the delivery below.</span>
+        <span class="live-map-info-sub">"Confirm delivered" is unlocked below.</span>
       </template>
       <template v-else-if="status === 'tracking' && remaining !== null">
         <span class="live-map-info-main">{{ offRoute ? "~" : "" }}{{ formatDistance(remaining) }} to go</span>
