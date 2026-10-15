@@ -1,0 +1,369 @@
+<script setup lang="ts">
+import { onMounted, ref } from "vue";
+import gsap from "gsap";
+import AppHeader from "../components/AppHeader.vue";
+import PosterScene from "../components/PosterScene.vue";
+import BouncyTitle from "../components/BouncyTitle.vue";
+import NotificationToast from "../components/NotificationToast.vue";
+import NotificationBell from "../components/NotificationBell.vue";
+import GameButton from "../components/GameButton.vue";
+import { GAME, formatVnd } from "../config/game";
+import { useGame } from "../store/game";
+import { prefersReducedMotion } from "../composables/useReducedMotion";
+
+// The home screen follows the client's poster theme (hand-drawn, crayon
+// colours); the in-game "shipper app" screens keep the hologram look.
+
+const { state, pendingOrders, deliveredOrders, earnings, go, start, resetRound } = useGame();
+
+// Flow: START → the bell shakes → tap it → "N orders need handling" drops in → tap → order list.
+const noticeOpen = ref(false);
+
+const bannerRef = ref<HTMLElement | null>(null);
+const subtitleRef = ref<HTMLElement | null>(null);
+const frameRef = ref<HTMLElement | null>(null);
+
+onMounted(() => {
+  if (prefersReducedMotion()) return;
+  gsap
+    .timeline({ delay: 0.6 })
+    .fromTo(bannerRef.value, { scaleX: 0, rotate: -4 }, { scaleX: 1, rotate: -2, duration: 0.55, ease: "back.out(1.6)" })
+    .fromTo(subtitleRef.value, { autoAlpha: 0, y: 10 }, { autoAlpha: 1, y: 0, duration: 0.4 }, "-=0.15")
+    .fromTo(frameRef.value, { autoAlpha: 0, y: 30, rotate: 2 }, { autoAlpha: 1, y: 0, rotate: 0, duration: 0.6, ease: "back.out(1.5)" }, "-=0.2");
+});
+</script>
+
+<template>
+  <div class="home">
+    <PosterScene />
+
+    <div class="home-layer">
+      <AppHeader tone="paper" :earnings="earnings" />
+
+      <div class="home-toast">
+        <NotificationToast
+          v-if="noticeOpen && pendingOrders.length > 0"
+          :app-name="GAME.appName"
+          :title="`Có ${pendingOrders.length} đơn hàng đang cần xử lý`"
+          message="Nhấn để xem danh sách đơn"
+          :badge="pendingOrders.length"
+          @open="go('orders')"
+        />
+      </div>
+
+      <main class="home-hero">
+        <BouncyTitle :text="GAME.title" />
+
+        <div ref="bannerRef" class="home-banner">
+          <svg class="home-banner-brush" viewBox="0 0 320 64" preserveAspectRatio="none" aria-hidden="true">
+            <path
+              d="M6 20c40-10 90-14 150-12s110 2 158 6c4 0 6 6 2 8-6 2-4 6 1 8 4 2 2 7-3 8-50 8-108 12-160 12S48 46 10 44c-5 0-7-6-2-8 5-2 4-6-1-8-4-2-5-7-1-8Z"
+            />
+          </svg>
+          <p class="home-banner-text">{{ GAME.banner }}</p>
+        </div>
+
+        <p ref="subtitleRef" class="home-subtitle">
+          <span class="home-subtitle-rays" aria-hidden="true"></span>
+          {{ GAME.subtitle }}
+          <span class="home-subtitle-rays home-subtitle-rays-right" aria-hidden="true"></span>
+        </p>
+
+        <!-- Hand-drawn frame, like the poster's photo frame — the game happens in here. -->
+        <section ref="frameRef" class="home-frame">
+          <template v-if="!state.started">
+            <svg class="home-scooter" viewBox="0 0 120 70" aria-hidden="true">
+              <path d="M30 18h22v18H30Z" class="home-scooter-box" />
+              <path d="M18 46h56l12-22h12" class="home-scooter-body" />
+              <path d="M58 46c0-8 6-12 14-12" class="home-scooter-body" />
+              <circle cx="26" cy="52" r="10" class="home-scooter-wheel" />
+              <circle cx="90" cy="52" r="10" class="home-scooter-wheel" />
+              <path d="M2 30h12M6 38h10M0 46h10" class="home-scooter-speed" />
+            </svg>
+            <GameButton variant="crayon" class="home-start" @click="start">START</GameButton>
+            <p class="home-frame-hint">Nhấn START để bắt đầu ca giao hàng</p>
+          </template>
+
+          <template v-else-if="pendingOrders.length > 0">
+            <NotificationBell variant="paper" :count="pendingOrders.length" @open="noticeOpen = true" />
+            <p class="home-frame-hint home-frame-hint-strong">
+              <template v-if="!noticeOpen">Bạn có thông báo mới — nhấn vào chuông!</template>
+              <template v-else>↑ Nhấn vào thông báo phía trên</template>
+            </p>
+          </template>
+
+          <template v-else>
+            <p class="home-finished-title">Hết đơn rồi! 🎉</p>
+            <p class="home-frame-hint">Cả đoàn đã giao xong toàn bộ đơn.</p>
+            <GameButton variant="crayon" block @click="resetRound">Chơi lại từ đầu</GameButton>
+          </template>
+
+          <dl v-if="state.started" class="home-stats">
+            <div>
+              <dt>Cần xử lý</dt>
+              <dd>{{ pendingOrders.length }}</dd>
+            </div>
+            <div>
+              <dt>Đã giao</dt>
+              <dd>{{ deliveredOrders.length }}</dd>
+            </div>
+            <div>
+              <dt>Thu nhập</dt>
+              <dd>{{ formatVnd(earnings) }}</dd>
+            </div>
+          </dl>
+        </section>
+
+        <button
+          v-if="deliveredOrders.length > 0 && pendingOrders.length > 0"
+          type="button"
+          class="home-reset"
+          @click="resetRound"
+        >
+          Làm lại từ đầu
+        </button>
+      </main>
+    </div>
+  </div>
+</template>
+
+<style scoped lang="scss">
+.home {
+  position: relative;
+  min-height: 100%;
+  color: var(--color-poster-ink);
+
+  &-layer {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 100%;
+    // Leave room for the harbour scene at the bottom of the poster.
+    padding-bottom: 170px;
+  }
+
+  &-toast {
+    min-height: 88px;
+    padding: 0 var(--space-md);
+  }
+
+  &-hero {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: 0 var(--space-md);
+    text-align: center;
+  }
+
+  // Brush-stroke banner under the title.
+  &-banner {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: min(100%, 300px);
+    height: 58px;
+    margin-top: 4px;
+    transform: rotate(-2deg);
+    transform-origin: left center;
+
+    &-brush {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+
+      path {
+        fill: var(--color-poster-blue);
+        filter: drop-shadow(2px 3px 0 var(--color-poster-ink));
+      }
+    }
+
+    &-text {
+      position: relative;
+      font-family: var(--font-hand);
+      font-weight: 700;
+      font-size: 22px;
+      color: var(--color-poster-yellow);
+      text-shadow: 2px 2px 0 var(--color-poster-ink);
+    }
+  }
+
+  // Yellow handwritten line with little sun-ray dashes, like the poster's date.
+  &-subtitle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    max-width: 330px;
+    font-family: var(--font-hand);
+    font-weight: 700;
+    font-size: 15px;
+    color: #e58a00;
+    text-shadow: 1px 1px 0 #fff;
+
+    &-rays {
+      flex-shrink: 0;
+      width: 16px;
+      height: 14px;
+      background:
+        linear-gradient(-25deg, transparent 45%, var(--color-poster-yellow) 45% 60%, transparent 60%) top / 100% 50% no-repeat,
+        linear-gradient(25deg, transparent 45%, var(--color-poster-yellow) 45% 60%, transparent 60%) bottom / 100% 50% no-repeat;
+
+      &-right {
+        transform: scaleX(-1);
+      }
+    }
+  }
+
+  // Hand-drawn frame: wonky border radius is the classic "sketched box" trick.
+  &-frame {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-sm);
+    width: 100%;
+    margin-top: var(--space-sm);
+    padding: var(--space-lg) var(--space-md) var(--space-md);
+    border: 3px solid var(--color-poster-blue);
+    border-radius: 255px 18px 225px 18px / 18px 225px 18px 255px;
+    background: rgba(255, 255, 255, 0.78);
+    box-shadow:
+      0 0 0 6px rgba(255, 255, 255, 0.55),
+      4px 6px 0 rgba(42, 85, 201, 0.35);
+
+    &-hint {
+      font-family: var(--font-hand);
+      font-weight: 600;
+      font-size: 14px;
+      color: #4a5a8a;
+
+      &-strong {
+        font-weight: 700;
+        font-size: 15px;
+        color: var(--color-poster-blue);
+      }
+    }
+  }
+
+  &-scooter {
+    width: 120px;
+    animation: home-scooter 0.5s ease-in-out infinite alternate;
+
+    &-box {
+      fill: var(--color-poster-yellow);
+      stroke: var(--color-poster-ink);
+      stroke-width: 3;
+      stroke-linejoin: round;
+    }
+
+    &-body {
+      fill: none;
+      stroke: var(--color-poster-red);
+      stroke-width: 5;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    &-wheel {
+      fill: #fff;
+      stroke: var(--color-poster-ink);
+      stroke-width: 4;
+    }
+
+    &-speed {
+      stroke: var(--color-poster-blue-light);
+      stroke-width: 3;
+      stroke-linecap: round;
+      animation: home-speed 0.4s linear infinite;
+    }
+  }
+
+  // Doubled class so these win over GameButton's own sizing.
+  &-start.game-button {
+    min-width: 210px;
+    min-height: 62px;
+    font-size: 28px;
+    letter-spacing: 0.16em;
+    animation: home-wiggle 2.4s ease-in-out infinite;
+  }
+
+  &-finished-title {
+    font-family: var(--font-poster);
+    font-weight: 800;
+    font-size: 26px;
+    color: var(--color-poster-red);
+  }
+
+  &-stats {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: var(--space-xs);
+    width: 100%;
+    margin: var(--space-xs) 0 0;
+    padding-top: var(--space-sm);
+    border-top: 2px dashed rgba(42, 85, 201, 0.35);
+
+    dt {
+      font-family: var(--font-hand);
+      font-size: 12px;
+      font-weight: 600;
+      color: #4a5a8a;
+    }
+
+    dd {
+      margin: 2px 0 0;
+      font-family: var(--font-poster);
+      font-weight: 800;
+      font-size: 19px;
+      color: var(--color-poster-blue);
+    }
+  }
+
+  &-reset {
+    border: none;
+    background: none;
+    font-family: var(--font-hand);
+    font-size: 13px;
+    color: #4a5a8a;
+    text-decoration: underline;
+    cursor: pointer;
+  }
+}
+
+@keyframes home-scooter {
+  to {
+    transform: translateY(-3px) rotate(-1.5deg);
+  }
+}
+
+@keyframes home-speed {
+  from {
+    transform: translateX(4px);
+    opacity: 1;
+  }
+  to {
+    transform: translateX(-6px);
+    opacity: 0.2;
+  }
+}
+
+// START tilts side to side every few seconds to invite a tap.
+@keyframes home-wiggle {
+  0%,
+  60%,
+  100% {
+    rotate: 0deg;
+  }
+  70% {
+    rotate: -4deg;
+  }
+  80% {
+    rotate: 4deg;
+  }
+  90% {
+    rotate: -2deg;
+  }
+}
+</style>
