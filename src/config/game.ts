@@ -51,21 +51,38 @@ export const DELIVERY = {
 
 export type GateInfo = {
   number: number;
-  /** One line telling players how to find the gate, e.g. "Main gate on Ly Thuong Kiet St". */
+  /** Street address of the gate. */
+  address: string;
+  /** One line telling players how to find the gate. */
   hint: string;
   /** [latitude, longitude] of the gate, or null to leave it off the map. */
   coords: [number, number] | null;
 };
 
 /**
- * TO CONFIRM WITH THE CLIENT: how to find each gate of HCMC University of
- * Technology. Left empty on purpose rather than guessed — an empty hint or
- * null coords simply isn't shown.
+ * Gates of HCMC University of Technology, as described by the client.
+ * Coordinates are null until confirmed on site (Google Maps: long-press the
+ * gate) — a wrong pin is worse than none; the hint and address still show.
  */
 export const GATE_INFO: GateInfo[] = [
-  { number: 1, hint: "", coords: null },
-  { number: 2, hint: "", coords: null },
-  { number: 3, hint: "", coords: null },
+  {
+    number: 1,
+    address: "268 Ly Thuong Kiet St, Dien Hong Ward (District 10)",
+    hint: "Main gate — by the large motorbike park, near Blocks A & B and the library (A4, A5).",
+    coords: null,
+  },
+  {
+    number: 2,
+    address: "To Hien Thanh St, Dien Hong Ward (District 10)",
+    hint: "Staff parking gate — near Block A and the C1 workshop.",
+    coords: null,
+  },
+  {
+    number: 3,
+    address: "142 To Hien Thanh St, Dien Hong Ward (District 10)",
+    hint: "Student & car park gate — near B9, B10, C4–C6 and the B4 canteen.",
+    coords: null,
+  },
 ];
 
 export const gateInfo = (gate: number) => GATE_INFO.find((info) => info.number === gate);
@@ -99,7 +116,11 @@ export const ORDERS: Order[] = Array.from({ length: ORDER_COUNT }, (_, index) =>
     id: `o${index + 1}`,
     number: index + 1,
     gate,
-    from: { label: "A", name: `${ROUTE.start.name} · Gate ${gate}`, address: ROUTE.start.address },
+    from: {
+      label: "A",
+      name: `${ROUTE.start.name} · Gate ${gate}`,
+      address: gateInfo(gate)?.address ?? ROUTE.start.address,
+    },
     to: destination,
     distanceKm: Math.round(ROUTE.distanceMeters / 100) / 10,
   };

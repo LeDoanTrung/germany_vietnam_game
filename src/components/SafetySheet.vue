@@ -27,7 +27,7 @@ watch(
       <HoloPanel tone="amber" class="sheet-card">
         <h2 id="sheet-title" class="sheet-title">Before you ride 🛵</h2>
         <ul class="sheet-list">
-          <li><span aria-hidden="true">🙋</span><span><b>The passenger holds the phone.</b> Drivers: only look when stopped.</span></li>
+          <li><span aria-hidden="true">🙋</span><span><b>Your driver does the riding.</b> You sit behind — hold on with one hand and keep a firm grip on your phone.</span></li>
           <li><span aria-hidden="true">📱</span><span><b>Keep this screen open.</b> Phones pause GPS when the screen locks.</span></li>
           <li><span aria-hidden="true">🔋</span><span><b>GPS uses battery.</b> Start charged, or bring a power bank.</span></li>
           <li><span aria-hidden="true">📶</span><span><b>You need internet</b> to confirm the delivery at the end.</span></li>

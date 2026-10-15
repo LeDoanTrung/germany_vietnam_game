@@ -223,7 +223,7 @@ const recenter = () => {
       <span><i class="live-map-legend-plan"></i>Suggested route</span>
     </p>
 
-    <p class="live-map-safety">🛵 Ride safely — don't use your phone while driving.</p>
+    <p class="live-map-safety">🛵 Hold on tight and keep a firm grip on your phone.</p>
   </figure>
 </template>
 
