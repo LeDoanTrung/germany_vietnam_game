@@ -188,12 +188,26 @@ const safetySeen = () => {
 };
 const safetyOpen = ref(false);
 
+// ---- Location ---------------------------------------------------------------
+// Taking an order turns location on straight away, so the phone's own
+// permission prompt is the only extra tap (browsers always require it).
+// Players who allowed it before aren't asked again — GPS just starts.
+
+const startLocationAfterAccept = async () => {
+  if (await resumeIfAllowed()) return;
+  if (gpsStatus.value !== "idle") return;
+  startGps();
+  keepScreenOn();
+};
+
 // Right after the player takes the order (not when reopening it later).
 watch(
   () => [isMine.value, status.value] as const,
   ([mine, current], previous) => {
     const justTaken = mine && current === "delivering" && previous?.[1] === "available";
-    if (justTaken && !safetySeen()) safetyOpen.value = true;
+    if (!justTaken) return;
+    if (!safetySeen()) safetyOpen.value = true;
+    void startLocationAfterAccept();
   },
 );
 

@@ -49,14 +49,22 @@ const stop = () => {
   if (status.value === "tracking" || status.value === "requesting") status.value = "idle";
 };
 
-/** Starts tracking without a tap if the player already allowed location before. */
+/**
+ * Starts tracking without asking if the player already allowed location
+ * before. Resolves to true when it started, false when the player still has
+ * to be asked (or the browser can't tell).
+ */
 const resumeIfAllowed = async () => {
   try {
     const permission = await navigator.permissions?.query({ name: "geolocation" });
-    if (permission?.state === "granted") start();
+    if (permission?.state === "granted") {
+      start();
+      return true;
+    }
   } catch {
-    // Permissions API missing (older iOS): wait for the player to tap.
+    // Permissions API missing (older iOS): the player has to be asked.
   }
+  return false;
 };
 
 export const useGeolocation = () => {
