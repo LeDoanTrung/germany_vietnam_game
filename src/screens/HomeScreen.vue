@@ -1,23 +1,35 @@
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
+import { computed, onMounted, ref } from "vue";
 import gsap from "gsap";
 import AppHeader from "../components/AppHeader.vue";
 import PosterScene from "../components/PosterScene.vue";
 import BouncyTitle from "../components/BouncyTitle.vue";
+import LogoStrip from "../components/LogoStrip.vue";
+import ChibiCrowd from "../components/ChibiCrowd.vue";
 import NotificationToast from "../components/NotificationToast.vue";
-import NotificationBell from "../components/NotificationBell.vue";
 import GameButton from "../components/GameButton.vue";
-import { GAME, formatVnd } from "../config/game";
+import { GAME, ORDERS, formatVnd } from "../config/game";
 import { useGame } from "../store/game";
+import { sounds } from "../composables/useSound";
 import { prefersReducedMotion } from "../composables/useReducedMotion";
 
 // The home screen follows the client's poster theme (hand-drawn, crayon
 // colours); the in-game "shipper app" screens keep the hologram look.
+//
+// Flow: type your name → START → the notification drops in → tap → order list.
 
-const { state, pendingOrders, deliveredOrders, earnings, go, start, resetRound } = useGame();
+const { state, availableOrders, deliveredOrders, myOrder, earnings, go, start, openOrder, canReset, resetRound } =
+  useGame();
 
-// Flow: START → the bell shakes → tap it → "N orders need handling" drops in → tap → order list.
-const noticeOpen = ref(false);
+const nameInput = ref(state.playerName);
+const canStart = computed(() => nameInput.value.trim().length > 0);
+
+const handleStart = () => {
+  if (!canStart.value) return;
+  start(nameInput.value);
+};
+
+const allDelivered = computed(() => deliveredOrders.value.length === ORDERS.length);
 
 const bannerRef = ref<HTMLElement | null>(null);
 const subtitleRef = ref<HTMLElement | null>(null);
@@ -31,27 +43,37 @@ onMounted(() => {
     .fromTo(subtitleRef.value, { autoAlpha: 0, y: 10 }, { autoAlpha: 1, y: 0, duration: 0.4 }, "-=0.15")
     .fromTo(frameRef.value, { autoAlpha: 0, y: 30, rotate: 2 }, { autoAlpha: 1, y: 0, rotate: 0, duration: 0.6, ease: "back.out(1.5)" }, "-=0.2");
 });
+
+const openMyOrder = () => {
+  if (!myOrder.value) return;
+  sounds.tap();
+  openOrder(myOrder.value.id);
+};
 </script>
 
 <template>
   <div class="home">
     <PosterScene />
+    <ChibiCrowd />
 
     <div class="home-layer">
       <AppHeader tone="paper" :earnings="earnings" />
 
+      <!-- Drops in as soon as START is pressed. -->
       <div class="home-toast">
         <NotificationToast
-          v-if="noticeOpen && pendingOrders.length > 0"
+          v-if="state.started && !myOrder && !allDelivered"
           :app-name="GAME.appName"
-          :title="`${pendingOrders.length} orders need handling`"
-          message="Tap to see the order list"
-          :badge="pendingOrders.length"
+          :title="availableOrders.length > 0 ? `${availableOrders.length} orders need handling` : 'All orders are taken'"
+          :message="availableOrders.length > 0 ? 'Tap to see the order list' : 'Tap to see who took them'"
+          :badge="availableOrders.length"
+          :delay="0.15"
           @open="go('orders')"
         />
       </div>
 
       <main class="home-hero">
+        <LogoStrip class="home-logos" />
         <BouncyTitle :text="GAME.title" />
 
         <div ref="bannerRef" class="home-banner">
@@ -71,7 +93,7 @@ onMounted(() => {
 
         <!-- Hand-drawn frame, like the poster's photo frame — the game happens in here. -->
         <section ref="frameRef" class="home-frame">
-          <template v-if="!state.started">
+          <form v-if="!state.started" class="home-start-form" @submit.prevent="handleStart">
             <svg class="home-scooter" viewBox="0 0 120 70" aria-hidden="true">
               <path d="M30 18h22v18H30Z" class="home-scooter-box" />
               <path d="M18 46h56l12-22h12" class="home-scooter-body" />
@@ -80,32 +102,45 @@ onMounted(() => {
               <circle cx="90" cy="52" r="10" class="home-scooter-wheel" />
               <path d="M2 30h12M6 38h10M0 46h10" class="home-scooter-speed" />
             </svg>
-            <GameButton variant="crayon" class="home-start" @click="start">START</GameButton>
-            <p class="home-frame-hint">Tap START to begin your delivery shift</p>
-          </template>
+            <label class="home-name">
+              <span class="home-name-label">What's your name, shipper?</span>
+              <input
+                v-model="nameInput"
+                class="home-name-input"
+                type="text"
+                maxlength="24"
+                placeholder="Your name"
+                autocomplete="given-name"
+                enterkeyhint="go"
+                required
+              />
+            </label>
+            <GameButton variant="crayon" class="home-start" type="submit" :disabled="!canStart">START</GameButton>
+          </form>
 
-          <template v-else-if="pendingOrders.length > 0">
-            <NotificationBell variant="paper" :count="pendingOrders.length" @open="noticeOpen = true" />
-            <p class="home-frame-hint home-frame-hint-strong">
-              <template v-if="!noticeOpen">You have a new notification — tap the bell!</template>
-              <template v-else>↑ Tap the notification above</template>
-            </p>
+          <template v-else-if="allDelivered">
+            <p class="home-finished-title">All delivered! 🎉</p>
+            <p class="home-frame-hint">The whole team has delivered every order.</p>
+            <GameButton v-if="canReset" variant="crayon" block @click="resetRound">Play again</GameButton>
           </template>
 
           <template v-else>
-            <p class="home-finished-title">All delivered! 🎉</p>
-            <p class="home-frame-hint">The whole team has delivered every order.</p>
-            <GameButton variant="crayon" block @click="resetRound">Play again</GameButton>
+            <p class="home-greeting">Hi, {{ state.playerName }}! 👋</p>
+            <template v-if="myOrder">
+              <p class="home-frame-hint">You're delivering Order {{ myOrder.number }}.</p>
+              <GameButton variant="crayon" block @click="openMyOrder">Open my order</GameButton>
+            </template>
+            <p v-else class="home-frame-hint home-frame-hint-strong">↑ Tap the notification above</p>
           </template>
 
           <dl v-if="state.started" class="home-stats">
             <div>
-              <dt>To handle</dt>
-              <dd>{{ pendingOrders.length }}</dd>
+              <dt>Available</dt>
+              <dd>{{ availableOrders.length }}</dd>
             </div>
             <div>
               <dt>Delivered</dt>
-              <dd>{{ deliveredOrders.length }}</dd>
+              <dd>{{ deliveredOrders.length }}/{{ ORDERS.length }}</dd>
             </div>
             <div>
               <dt>Earnings</dt>
@@ -114,12 +149,7 @@ onMounted(() => {
           </dl>
         </section>
 
-        <button
-          v-if="deliveredOrders.length > 0 && pendingOrders.length > 0"
-          type="button"
-          class="home-reset"
-          @click="resetRound"
-        >
+        <button v-if="canReset && state.started && deliveredOrders.length > 0" type="button" class="home-reset" @click="resetRound">
           Start over
         </button>
       </main>
@@ -143,9 +173,18 @@ onMounted(() => {
     padding-bottom: 170px;
   }
 
+  // Overlays the top of the poster like a real push notification, instead of
+  // reserving empty space for it.
   &-toast {
-    min-height: 88px;
-    padding: 0 var(--space-md);
+    position: absolute;
+    top: max(var(--space-sm), env(safe-area-inset-top));
+    left: var(--space-md);
+    right: var(--space-md);
+    z-index: 10;
+  }
+
+  &-logos {
+    margin-bottom: var(--space-sm);
   }
 
   &-hero {
@@ -287,6 +326,63 @@ onMounted(() => {
     font-size: 28px;
     letter-spacing: 0.16em;
     animation: home-wiggle 2.4s ease-in-out infinite;
+  }
+
+  &-start-form {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-sm);
+    width: 100%;
+  }
+
+  &-name {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    width: 100%;
+    max-width: 280px;
+
+    &-label {
+      font-family: var(--font-hand);
+      font-weight: 700;
+      font-size: 15px;
+      color: var(--color-poster-blue);
+    }
+
+    // Hand-drawn input: wonky radius, ink outline, offset shadow.
+    &-input {
+      width: 100%;
+      min-height: 48px;
+      padding: 10px 14px;
+      border: 2.5px solid var(--color-poster-ink);
+      border-radius: 14px 18px 12px 20px / 18px 12px 20px 14px;
+      background: #fff;
+      box-shadow: 3px 4px 0 rgba(31, 42, 110, 0.35);
+      color: var(--color-poster-ink);
+      // 16px+ stops iOS Safari zooming in when the field is focused.
+      font-family: var(--font-poster);
+      font-weight: 800;
+      font-size: 20px;
+      text-align: center;
+
+      &::placeholder {
+        color: rgba(31, 42, 110, 0.35);
+      }
+
+      &:focus {
+        outline: none;
+        border-color: var(--color-poster-red);
+        box-shadow: 3px 4px 0 var(--color-poster-red);
+      }
+    }
+  }
+
+  &-greeting {
+    font-family: var(--font-poster);
+    font-weight: 800;
+    font-size: 24px;
+    color: var(--color-poster-red);
   }
 
   &-finished-title {

@@ -10,8 +10,9 @@ const props = withDefaults(
     disabled?: boolean;
     /** Play the default tap sound. Off when the parent plays its own. */
     tapSound?: boolean;
+    type?: "button" | "submit";
   }>(),
-  { variant: "primary", block: false, disabled: false, tapSound: true },
+  { variant: "primary", block: false, disabled: false, tapSound: true, type: "button" },
 );
 
 const emit = defineEmits<{ click: [event: MouseEvent] }>();
@@ -40,7 +41,7 @@ const handleClick = (event: MouseEvent) => {
 
 <template>
   <button
-    type="button"
+    :type="props.type"
     :class="['game-button', `game-button-${props.variant}`, { 'game-button-block': props.block }]"
     :disabled="props.disabled"
     @click="handleClick"

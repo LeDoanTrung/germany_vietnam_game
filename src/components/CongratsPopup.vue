@@ -9,7 +9,7 @@ import { formatVnd } from "../config/game";
 import { useGame } from "../store/game";
 import { prefersReducedMotion } from "../composables/useReducedMotion";
 
-const { state, currentOrder, pendingOrders, go, closeCongrats } = useGame();
+const { state, currentOrder, go, closeCongrats } = useGame();
 
 const primaryRef = ref<InstanceType<typeof GameButton> | null>(null);
 
@@ -82,7 +82,7 @@ onBeforeUnmount(() => {
 
         <ScrambleText id="congrats-title" text="Congratulations!" as="h2" class="congrats-title" :delay="0.3" />
         <p class="congrats-copy">
-          <strong>{{ currentOrder.shipper }}</strong> delivered Order {{ currentOrder.number }} —
+          <strong>{{ state.playerName || "You" }}</strong> delivered Order {{ currentOrder.number }} —
           {{ currentOrder.item }} to {{ currentOrder.to.name }}.
         </p>
 
@@ -93,7 +93,7 @@ onBeforeUnmount(() => {
 
         <div class="congrats-actions">
           <GameButton ref="primaryRef" block @click="go('orders', null)">
-            {{ pendingOrders.length > 0 ? `Back to orders (${pendingOrders.length} left)` : "Back to orders" }}
+            Back to orders
           </GameButton>
           <GameButton variant="ghost" block @click="go('home', null)">Back to home</GameButton>
         </div>

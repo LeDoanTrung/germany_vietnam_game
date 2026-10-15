@@ -1,6 +1,5 @@
 // Everything the client is likely to want to change lives in this file.
-// There is no database: each name in PLAYERS gets exactly one order, so the
-// order list always shows as many orders as there are people in the group.
+import { ROUTE } from "./route";
 
 export type Place = {
   /** Short label shown on the route, e.g. "A". */
@@ -15,12 +14,12 @@ export type Order = {
   number: number;
   item: string;
   quantity: number;
-  /** Pick-up point. */
+  /** Pick-up point: a gate of the host university. */
   from: Place;
-  /** Drop-off point. */
+  /** Drop-off point: the fixed destination of the ride. */
   to: Place;
-  /** The player dispatched to deliver this order. */
-  shipper: string;
+  /** Gate where the shipper waits after taking the order. */
+  gate: number;
   distanceKm: number;
   /** Shipping fee earned, in VND. */
   reward: number;
@@ -28,73 +27,45 @@ export type Order = {
 };
 
 export const GAME = {
-  // Placeholder — replace with the name the client picks.
-  title: "Super Shipper",
+  title: "PhD Workshop 2026",
   /** Text on the blue brush-stroke banner under the title. */
-  banner: "Germany – Vietnam",
-  subtitle: "Play the shipper — deliver every order!",
+  banner: "Shipper Role-Play Game",
+  subtitle: "KLU Saigon · 25–30 October 2026",
   appName: "Shipper App",
 };
 
-// Placeholder names — replace with the real list of people in the group.
-// Add or remove names and the number of orders follows automatically.
-export const PLAYERS: string[] = ["Alex", "Ben", "Chloe", "Daniel", "Emma", "Felix", "Grace", "Hannah", "Ian", "Julia"];
+/**
+ * One order per person in the group. Players pick an order themselves (or use
+ * the random draw); once someone takes an order nobody else can.
+ */
+export const ORDER_COUNT = 12;
 
-type OrderTemplate = Omit<Order, "id" | "number" | "shipper">;
+/** Every order starts at one of these gates of the host university. */
+const GATES = [1, 2, 3];
 
-// Orders are dealt out from this pool in turn, so it can be shorter than the
-// player list — the details just repeat.
-const ORDER_POOL: OrderTemplate[] = [
-  {
-    item: "Glass of beer",
-    quantity: 1,
-    from: { label: "A", name: "Beer Bar A", address: "12 Harbor Street, District 1" },
-    to: { label: "B", name: "Guest House B", address: "88 River Road, District 5" },
-    distanceKm: 4.2,
-    reward: 25000,
-    note: "Fragile — keep the glass upright.",
-  },
-  {
-    item: "Case of 24 beers",
-    quantity: 2,
-    from: { label: "A", name: "Wholesaler A", address: "301 Market Avenue, District 3" },
-    to: { label: "B", name: "Restaurant B", address: "19 Garden Street, District 7" },
-    distanceKm: 6.8,
-    reward: 42000,
-  },
-  {
-    item: "Set of glasses",
-    quantity: 6,
-    from: { label: "A", name: "Shop A", address: "56 Park Lane, District 1" },
-    to: { label: "B", name: "Apartment B", address: "2 Riverside Drive, District 2" },
-    distanceKm: 3.5,
-    reward: 30000,
-    note: "Call 10 minutes before delivery.",
-  },
-  {
-    item: "Crate of soft drinks",
-    quantity: 1,
-    from: { label: "A", name: "Grocery A", address: "77 Station Road, District 3" },
-    to: { label: "B", name: "Office B", address: "135 Central Avenue, District 3" },
-    distanceKm: 2.1,
-    reward: 18000,
-  },
-  {
-    item: "Birthday cake",
-    quantity: 1,
-    from: { label: "A", name: "Bakery A", address: "24 Baker Street, District 1" },
-    to: { label: "B", name: "Home B", address: "61 Ocean Boulevard, District 1" },
-    distanceKm: 2.9,
-    reward: 22000,
-    note: "Keep it level — do not stack.",
-  },
+// What's in each parcel. Dealt out in turn, so the list can be shorter than ORDER_COUNT.
+const PARCELS: { item: string; quantity: number; reward: number; note?: string }[] = [
+  { item: "Glass of beer", quantity: 1, reward: 25000, note: "Fragile — keep the glass upright." },
+  { item: "Case of 24 beers", quantity: 2, reward: 42000 },
+  { item: "Set of glasses", quantity: 6, reward: 30000, note: "Handle with care." },
+  { item: "Crate of soft drinks", quantity: 1, reward: 18000 },
+  { item: "Birthday cake", quantity: 1, reward: 22000, note: "Keep it level — do not stack." },
+  { item: "Box of snacks", quantity: 3, reward: 20000 },
 ];
 
-export const ORDERS: Order[] = PLAYERS.map((shipper, index) => ({
-  ...ORDER_POOL[index % ORDER_POOL.length]!,
-  id: `o${index + 1}`,
-  number: index + 1,
-  shipper,
-}));
+const destination: Place = { label: "B", name: ROUTE.destination.name, address: ROUTE.destination.address };
+
+export const ORDERS: Order[] = Array.from({ length: ORDER_COUNT }, (_, index) => {
+  const gate = GATES[index % GATES.length]!;
+  return {
+    ...PARCELS[index % PARCELS.length]!,
+    id: `o${index + 1}`,
+    number: index + 1,
+    gate,
+    from: { label: "A", name: `${ROUTE.start.name} · Gate ${gate}`, address: ROUTE.start.address },
+    to: destination,
+    distanceKm: Math.round(ROUTE.distanceMeters / 100) / 10,
+  };
+});
 
 export const formatVnd = (amount: number) => `${amount.toLocaleString("en-US")} VND`;

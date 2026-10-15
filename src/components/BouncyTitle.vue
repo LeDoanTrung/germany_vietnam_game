@@ -52,10 +52,10 @@ onMounted(() => {
   margin: 0;
   font-family: var(--font-poster);
   font-weight: 800;
-  font-size: clamp(44px, 13vw, 62px);
+  // No uppercase transform: "PhD" has to keep its lowercase h.
+  font-size: clamp(40px, 11.5vw, 56px);
   line-height: 1;
   letter-spacing: 0.01em;
-  text-transform: uppercase;
   color: var(--color-poster-red);
 
   &-word {

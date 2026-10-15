@@ -6,11 +6,11 @@ import StatusBadge from "../components/StatusBadge.vue";
 import GameButton from "../components/GameButton.vue";
 import { ORDERS, formatVnd } from "../config/game";
 import { STATUS_TONE, statusSentence } from "../config/status";
-import { statusOf, useGame } from "../store/game";
+import { claimOf, statusOf, useGame } from "../store/game";
 import { sounds } from "../composables/useSound";
 import { prefersReducedMotion } from "../composables/useReducedMotion";
 
-const { pendingOrders, earnings, back, openOrder } = useGame();
+const { availableOrders, myOrder, earnings, back, openOrder } = useGame();
 
 const handleOpen = (id: string) => {
   if (drawing.value) return;
@@ -18,8 +18,9 @@ const handleOpen = (id: string) => {
   openOrder(id);
 };
 
-// Random draw — a highlight hops between the open orders, slowing down like a
-// prize wheel, and lands on one at random.
+// Random draw — a highlight hops between the orders nobody has taken yet,
+// slowing down like a prize wheel, and lands on one at random. It only opens
+// the order; the player still taps "Accept order" to take it.
 const drawing = ref(false);
 const highlightedId = ref<string | null>(null);
 const cardRefs = new Map<string, HTMLElement>();
@@ -36,8 +37,8 @@ const highlight = (id: string) => {
 };
 
 const drawRandom = () => {
-  const candidates = pendingOrders.value.map((order) => order.id);
-  if (drawing.value || candidates.length === 0) return;
+  const candidates = availableOrders.value.map((order) => order.id);
+  if (drawing.value || candidates.length === 0 || myOrder.value) return;
 
   drawing.value = true;
   const winner = candidates[Math.floor(Math.random() * candidates.length)]!;
@@ -79,13 +80,19 @@ onBeforeUnmount(() => timers.forEach((timer) => window.clearTimeout(timer)));
     <AppHeader :title="`Orders (${ORDERS.length})`" show-back :earnings="earnings" @back="back" />
 
     <div class="orders-intro">
-      <p class="orders-intro-copy">
-        Find the order with your name — or let the app draw one. <b>{{ pendingOrders.length }}</b> orders left to handle.
+      <template v-if="myOrder">
+        <p class="orders-intro-copy">You took <b>Order {{ myOrder.number }}</b>. Each shipper delivers one order.</p>
+        <GameButton block @click="handleOpen(myOrder.id)">Open my order</GameButton>
+      </template>
+      <p v-else class="orders-intro-copy">
+        Pick an order — or let the app draw one for you. Once someone takes an order, nobody else can.
+        <b>{{ availableOrders.length }}</b> still available.
       </p>
       <GameButton
+        v-if="!myOrder"
         variant="ghost"
         block
-        :disabled="drawing || pendingOrders.length === 0"
+        :disabled="drawing || availableOrders.length === 0"
         :tap-sound="false"
         @click="drawRandom"
       >
@@ -111,22 +118,32 @@ onBeforeUnmount(() => timers.forEach((timer) => window.clearTimeout(timer)));
         :class="[
           'orders-card',
           {
-            'orders-card-done': statusOf(order.id) === 'delivered',
+            'orders-card-done': statusOf(order.id) !== 'available' && !claimOf(order.id)?.mine,
+            'orders-card-mine': claimOf(order.id)?.mine,
             'orders-card-highlight': highlightedId === order.id,
           },
         ]"
       >
         <button type="button" class="orders-card-button" :disabled="drawing" @click="handleOpen(order.id)">
           <span class="orders-card-top">
-            <span class="orders-card-number">Order {{ order.number }}</span>
+            <span class="orders-card-number">
+              Order {{ order.number }}
+              <span v-if="claimOf(order.id)?.mine" class="orders-card-yours">Your order</span>
+            </span>
             <StatusBadge :status="statusOf(order.id)" />
           </span>
 
           <span class="orders-card-shipper">
-            <span class="orders-card-avatar" aria-hidden="true">{{ order.shipper.charAt(0) }}</span>
+            <span
+              :class="['orders-card-avatar', { 'orders-card-avatar-empty': statusOf(order.id) === 'available' }]"
+              aria-hidden="true"
+              >{{ claimOf(order.id)?.shipper.charAt(0).toUpperCase() ?? "?" }}</span
+            >
             <span>
               <span class="orders-card-shipper-label">Status</span>
-              <span class="orders-card-shipper-name">{{ statusSentence(statusOf(order.id), order.shipper) }}</span>
+              <span class="orders-card-shipper-name">{{
+                statusSentence(statusOf(order.id), claimOf(order.id)?.shipper)
+              }}</span>
             </span>
           </span>
 
@@ -233,11 +250,30 @@ onBeforeUnmount(() => timers.forEach((timer) => window.clearTimeout(timer)));
     }
 
     &-number {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
       font-size: 14px;
       font-weight: 900;
       letter-spacing: 0.08em;
       text-transform: uppercase;
       color: var(--color-cyan-300);
+    }
+
+    &-yours {
+      padding: 2px 8px;
+      border-radius: var(--radius-pill);
+      background: var(--color-amber-400);
+      color: #1d1200;
+      font-size: 11px;
+      letter-spacing: 0.04em;
+    }
+
+    // The player's own order stands out from the rest.
+    &.orders-card-mine {
+      box-shadow:
+        0 0 0 2px var(--color-amber-400),
+        0 0 28px rgba(255, 176, 32, 0.4);
     }
 
     &-shipper {
@@ -270,6 +306,13 @@ onBeforeUnmount(() => timers.forEach((timer) => window.clearTimeout(timer)));
       color: #1d1200;
       font-size: 18px;
       font-weight: 900;
+
+      // Nobody has taken this order yet.
+      &-empty {
+        background: transparent;
+        border: 2px dashed var(--color-cyan-400);
+        color: var(--color-cyan-300);
+      }
     }
 
     &-item {

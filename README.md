@@ -1,50 +1,66 @@
-# Germany – Vietnam Shipper Game
+# PhD Workshop 2026 – Shipper Role-Play Game
 
-A shipper role-play web game that runs entirely in the browser: no database, no API calls.
-Each player's progress is kept in `localStorage` on their own device. Designed for phones.
+A shipper role-play web game for the KLU PhD Workshop (Saigon, 25–30 October 2026). Designed for phones, hosted on
+GitHub Pages. The only backend is Firebase, which keeps the order list in sync so nobody takes an order twice.
 
 ## How it plays
 
-1. **Home screen** (hand-drawn poster theme): the game title, then a **START** button.
-2. START reveals a **shaking bell**. Tapping it drops in a notification: *"10 orders need handling"*.
-3. Tapping the notification opens the **order list**. Every player has one order, with the status
-   *"Dispatching shipper [name]"*. Players find the order with their name, or use **Random draw**.
-4. Inside an order: where it goes from and to, and an **Accept order** button. Accepting starts the animated
-   map from the start point to the end point, with the status *"Delivering"* and a **Confirm delivered** button.
-5. Confirming opens the **Congratulations!** pop-up.
+1. **Home screen** (hand-drawn poster theme, KLU and Learn Logistics logos): type your name, tap **START**.
+2. A notification drops in: *"12 orders need handling"*. Tap it to open the **order list**.
+3. Pick an order (or use **Random draw**) and tap **Accept order**. Once someone takes an order it is locked for
+   everyone else, and each player can only take one. The order then shows where to wait: **Gate 1, 2 or 3** of
+   HCMC University of Technology, with the status *"Dispatching shipper [name]"*.
+4. Ride to the destination. The **live map** shows the route and, if location is allowed, the player's position and
+   the distance left. GPS is just for fun: it never blocks the game.
+5. Tap **Confirm delivered** → **Congratulations!**
 
 ## Run locally
 
 ```bash
 npm install
-npm run dev      # http://localhost:3100
-npm run build    # typecheck + production build into dist/
+npm run dev          # http://localhost:3100
+npm run build        # typecheck + production build into dist/
+npm run test:rules   # check firestore.rules on the Firestore emulator (needs Java)
 ```
 
 ## Editing content
 
-All content lives in `src/config/game.ts`:
+- `src/config/game.ts`: title, banner, subtitle, number of orders (`ORDER_COUNT`), gates and parcels.
+- `src/config/route-waypoints.json`: start, destination and optional `via` stops of the ride, as
+  `[latitude, longitude]` (Google Maps: long-press a spot to copy). After editing, run `npm run route` to regenerate
+  `src/config/route-path.json`. The street path is precomputed, so the game never calls a routing API.
 
-- `GAME.title`: game name (currently a placeholder). `GAME.banner`: text on the blue banner. `GAME.subtitle`: the yellow line.
-- `PLAYERS`: names of the people in the group. **Number of orders = number of names**. Add or remove a name and the
-  order count follows.
-- `ORDER_POOL`: items, start/end points, distance, shipping fee. Orders are dealt from this pool in turn, so it can be
-  shorter than the player list.
+## Firebase setup (one time)
+
+Until this is done the game runs in **local mode**: everything works, but each phone only knows about its own order.
+
+1. Go to https://console.firebase.google.com → **Add project** (Google Analytics not needed). The free Spark plan is enough.
+2. **Build → Authentication → Get started → Sign-in method → Anonymous → Enable.**
+3. **Build → Firestore Database → Create database** → pick a location close to Vietnam (e.g. `asia-southeast1`) → start in
+   production mode.
+4. **Firestore Database → Rules**: paste the contents of `firestore.rules`, then **Publish**.
+5. **Project settings → Your apps → Web (`</>`)** → register an app → copy `apiKey`, `authDomain`, `projectId` and `appId`
+   into `src/config/firebase.ts`. These values are public by design; the rules control access.
+6. **Authentication → Settings → Authorized domains** → add `ledoantrung.github.io`.
+7. Commit and push.
+
+**Resetting for a new group:** delete the `rounds` collection in the Firestore console, or change `ROUND_ID` in
+`src/config/firebase.ts` and redeploy.
 
 ## Deploying to GitHub Pages
 
 Repository: https://github.com/LeDoanTrung/germany_vietnam_game
 
-1. Push to `main`. The workflow in `.github/workflows/deploy.yml` builds the site and publishes it to the `gh-pages` branch.
-2. First time only: **Settings → Pages → Source: Deploy from a branch → `gh-pages` / root**.
-3. The game is live at https://ledoantrung.github.io/germany_vietnam_game/
+Push to `main`: the workflow builds the site and publishes it to `gh-pages`. The game is live at
+https://ledoantrung.github.io/germany_vietnam_game/
 
 ## Technical notes
 
 - Vue 3 + Vite + TypeScript, animations with GSAP.
-- The home screen uses the hand-drawn poster theme (self-drawn SVG illustrations with a crayon texture filter); the
-  in-game "shipper app" screens use a hologram style.
+- Live map: Leaflet with OpenStreetMap tiles (© OpenStreetMap contributors). Location stays on the phone; it is never sent.
+  While the map is open the screen is kept awake, because phones pause GPS for web pages when the screen locks.
+- Taking an order is a Firestore transaction, and `firestore.rules` enforces one order per order and one order per player
+  on the server, so it holds even if two players tap at the same moment.
+- Firebase and Leaflet are loaded on demand, so the home screen stays light on phones.
 - Sounds are synthesised with the Web Audio API, so no audio files ship with the app.
-- Fonts (bundled via `@fontsource`): Baloo 2, Mali, Be Vietnam Pro, Space Mono. All include Vietnamese diacritics,
-  so accented player names render correctly.
 - Honours the operating system's *reduce motion* setting (`prefers-reduced-motion`).

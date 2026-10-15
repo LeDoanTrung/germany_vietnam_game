@@ -8,7 +8,7 @@ const props = defineProps<{
   current: number;
 }>();
 
-const STEPS = ["Dispatch", "Accept", "Delivering", "Delivered"];
+const STEPS = ["Order", "Accept", "Deliver", "Done"];
 
 const fillRef = ref<HTMLElement | null>(null);
 

@@ -1,0 +1,6 @@
+{
+  "_note": "Real route for the ride. To change it, edit the stops and run `npm run route` to regenerate route-path.json. Coordinates are [latitude, longitude] (Google Maps: long-press a spot to copy them). Add sightseeing stops to `via` to steer the route past them.",
+  "start": { "name": "HCMC University of Technology", "address": "268 Ly Thuong Kiet St, District 10", "coords": [10.77335, 106.65963] },
+  "via": [],
+  "destination": { "name": "BiaCraft Artisan Ales", "address": "1 Le Ngo Cat St, District 3", "coords": [10.77632, 106.68559] }
+}

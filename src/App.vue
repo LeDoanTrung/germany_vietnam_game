@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { computed, watch, type Component } from "vue";
+import { computed, onMounted, watch, type Component } from "vue";
 import HomeScreen from "./screens/HomeScreen.vue";
 import OrdersScreen from "./screens/OrdersScreen.vue";
 import OrderScreen from "./screens/OrderScreen.vue";
 import CongratsPopup from "./components/CongratsPopup.vue";
-import { useGame, type ScreenName } from "./store/game";
+import Snackbar from "./components/Snackbar.vue";
+import { connectClaims, useGame, type ScreenName } from "./store/game";
 import { sounds } from "./composables/useSound";
 
 const { state } = useGame();
@@ -20,6 +21,10 @@ const activeScreen = computed(() => SCREENS[state.screen]);
 const screenKey = computed(() => `${state.screen}:${state.orderId ?? ""}`);
 
 watch(screenKey, () => sounds.whoosh());
+
+// Start listening for which orders are taken straight away, so the list is
+// up to date by the time the player gets there.
+onMounted(() => void connectClaims());
 
 // Fixed positions so the particles don't jump around on re-render.
 const PARTICLES = Array.from({ length: 14 }, (_, index) => ({
@@ -57,6 +62,7 @@ const PARTICLES = Array.from({ length: 14 }, (_, index) => ({
 
       <!-- Lives at phone level so it covers the frame, not the whole browser window. -->
       <CongratsPopup />
+      <Snackbar />
     </div>
   </div>
 </template>
