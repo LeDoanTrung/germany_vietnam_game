@@ -90,6 +90,8 @@ ul {
 button {
   font: inherit;
   color: inherit;
+  // Stops iOS zooming the page on a quick double tap.
+  touch-action: manipulation;
 }
 
 :focus-visible {

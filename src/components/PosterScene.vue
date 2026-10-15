@@ -55,13 +55,17 @@ const CONTAINERS = [
 
       <!-- Sun -->
       <g class="poster-sun">
-        <g class="poster-sun-rays" :filter="`url(#${crayonId})`">
-          <path
-            v-for="index in 10"
-            :key="index"
-            d="M345 22v-12"
-            :transform="`rotate(${index * 36} 345 58)`"
-          />
+        <!-- Outer group spins, inner group holds the filter: the filter is
+             computed once instead of every frame (matters on phones). -->
+        <g class="poster-sun-rays">
+          <g :filter="`url(#${crayonId})`">
+            <path
+              v-for="index in 10"
+              :key="index"
+              d="M345 22v-12"
+              :transform="`rotate(${index * 36} 345 58)`"
+            />
+          </g>
         </g>
         <circle cx="345" cy="58" r="22" class="poster-sun-face" :filter="`url(#${crayonId})`" />
       </g>
@@ -73,11 +77,15 @@ const CONTAINERS = [
       </g>
 
       <!-- Clouds -->
-      <g class="poster-cloud poster-cloud-a" :filter="`url(#${crayonId})`">
-        <path d="M30 168c-2-9 9-14 15-8 3-9 17-10 20-1 9-2 14 9 6 13H34c-3 0-5-2-4-4Z" />
+      <g class="poster-cloud poster-cloud-a">
+        <g :filter="`url(#${crayonId})`">
+          <path d="M30 168c-2-9 9-14 15-8 3-9 17-10 20-1 9-2 14 9 6 13H34c-3 0-5-2-4-4Z" />
+        </g>
       </g>
-      <g class="poster-cloud poster-cloud-b" :filter="`url(#${crayonId})`">
-        <path d="M318 176c-2-8 8-12 13-7 3-8 15-9 18-1 8-2 12 8 5 11h-32c-3 0-4-1-4-3Z" />
+      <g class="poster-cloud poster-cloud-b">
+        <g :filter="`url(#${crayonId})`">
+          <path d="M318 176c-2-8 8-12 13-7 3-8 15-9 18-1 8-2 12 8 5 11h-32c-3 0-4-1-4-3Z" />
+        </g>
       </g>
     </svg>
 
@@ -160,16 +168,21 @@ const CONTAINERS = [
       </g>
 
       <!-- Crossed flags: Vietnam and Germany -->
-      <g class="poster-flags" :filter="`url(#${crayonBottomId})`">
-        <path d="M190 196l26-62M212 196l-26-62" class="poster-pole" />
+      <g class="poster-flags">
+        <path d="M190 196l26-62M212 196l-26-62" class="poster-pole" :filter="`url(#${crayonBottomId})`" />
+        <!-- Each flag waves on its outer group; the filter sits on the static inner group. -->
         <g class="poster-flag poster-flag-vn">
-          <path d="M186 134l-30-4 4 22 30 4Z" fill="#da251d" />
-          <path d="M173 136l2 5 5 0-4 3 2 5-5-3-4 3 1-5-4-3 5 0Z" fill="#ffd23f" />
+          <g :filter="`url(#${crayonBottomId})`">
+            <path d="M186 134l-30-4 4 22 30 4Z" fill="#da251d" />
+            <path d="M173 136l2 5 5 0-4 3 2 5-5-3-4 3 1-5-4-3 5 0Z" fill="#ffd23f" />
+          </g>
         </g>
         <g class="poster-flag poster-flag-de">
-          <path d="M216 134l30-4-1 7-30 4Z" fill="#1d1d1d" />
-          <path d="M215 141l30-4-1 7-30 4Z" fill="#dd0000" />
-          <path d="M214 148l30-4-1 8-30 4Z" fill="#ffce00" />
+          <g :filter="`url(#${crayonBottomId})`">
+            <path d="M216 134l30-4-1 7-30 4Z" fill="#1d1d1d" />
+            <path d="M215 141l30-4-1 7-30 4Z" fill="#dd0000" />
+            <path d="M214 148l30-4-1 8-30 4Z" fill="#ffce00" />
+          </g>
         </g>
       </g>
     </svg>

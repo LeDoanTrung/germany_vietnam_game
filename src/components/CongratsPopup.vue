@@ -111,6 +111,7 @@ onBeforeUnmount(() => {
   place-items: center;
   padding: var(--space-md);
   background: rgba(2, 10, 28, 0.72);
+  -webkit-backdrop-filter: blur(6px); // iOS Safari < 18
   backdrop-filter: blur(6px);
 
   // Doubled class so the padding wins over HoloPanel's own.

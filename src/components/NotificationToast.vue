@@ -88,6 +88,7 @@ const handleOpen = () => {
   border: 1px solid rgba(129, 216, 255, 0.35);
   border-radius: var(--radius-lg);
   background: rgba(10, 30, 66, 0.9);
+  -webkit-backdrop-filter: blur(14px); // iOS Safari < 18
   backdrop-filter: blur(14px);
   // Explicit, so it stays readable on the light poster home as well.
   color: var(--color-text-100);
