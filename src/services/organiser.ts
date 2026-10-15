@@ -43,9 +43,15 @@ export const organiser = {
     );
   },
 
+  /** Rejects with code "timeout" if Firebase doesn't answer, instead of hanging forever. */
   async signIn(email: string, password: string) {
     const { auth, appAuth } = await sdk();
-    await auth.signInWithEmailAndPassword(appAuth, email.trim(), password);
+    await Promise.race([
+      auth.signInWithEmailAndPassword(appAuth, email.trim(), password),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(Object.assign(new Error("timeout"), { code: "timeout" })), 15000),
+      ),
+    ]);
   },
 
   async signOut() {

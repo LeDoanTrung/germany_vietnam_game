@@ -57,14 +57,28 @@ onBeforeUnmount(() => {
 
 const email = ref("");
 const password = ref("");
+const showPassword = ref(false);
+
+const SIGN_IN_ERRORS: Record<string, string> = {
+  "auth/invalid-credential": "Wrong email or password.",
+  "auth/invalid-login-credentials": "Wrong email or password.",
+  "auth/wrong-password": "Wrong email or password.",
+  "auth/user-not-found": "Wrong email or password.",
+  "auth/invalid-email": "That doesn't look like an email address.",
+  "auth/user-disabled": "This account has been disabled in Firebase.",
+  "auth/too-many-requests": "Too many attempts — wait a minute and try again.",
+  "auth/network-request-failed": "No connection to Firebase — check your internet, or switch off a VPN such as 1.1.1.1/WARP.",
+  timeout: "Firebase didn't answer — check your internet, or switch off a VPN such as 1.1.1.1/WARP, then try again.",
+};
 
 const handleSignIn = async () => {
   busy.value = true;
   try {
     await organiser.signIn(email.value, password.value);
     password.value = "";
-  } catch {
-    flash("Wrong email or password.");
+  } catch (error) {
+    const code = (error as { code?: string }).code ?? "";
+    flash(SIGN_IN_ERRORS[code] ?? `Couldn't sign in (${code || "unknown error"}).`);
   } finally {
     busy.value = false;
   }
@@ -211,9 +225,25 @@ const gameUrl = computed(() => location.href.replace(/#.*$/, ""));
       </label>
       <label>
         Password
-        <input v-model="password" type="password" autocomplete="current-password" required />
+        <span class="org-password">
+          <input
+            v-model="password"
+            :type="showPassword ? 'text' : 'password'"
+            autocomplete="current-password"
+            required
+          />
+          <button
+            type="button"
+            class="org-password-toggle"
+            :aria-pressed="showPassword"
+            :aria-label="showPassword ? 'Hide password' : 'Show password'"
+            @click="showPassword = !showPassword"
+          >
+            {{ showPassword ? "Hide" : "Show" }}
+          </button>
+        </span>
       </label>
-      <button type="submit" class="org-button" :disabled="busy">Sign in</button>
+      <button type="submit" class="org-button" :disabled="busy">{{ busy ? "Signing in…" : "Sign in" }}</button>
     </form>
 
     <section v-else-if="phase === 'not-admin'" class="org-card">
@@ -439,6 +469,34 @@ const gameUrl = computed(() => location.href.replace(/#.*$/, ""));
 
   &-login {
     max-width: 380px;
+  }
+
+  // Password field with a Show/Hide button inside it.
+  &-password {
+    position: relative;
+    display: flex;
+
+    input {
+      flex: 1;
+      min-width: 0;
+      padding-right: 70px;
+    }
+
+    &-toggle {
+      position: absolute;
+      top: 50%;
+      right: 6px;
+      transform: translateY(-50%);
+      min-width: 56px;
+      min-height: 34px;
+      border: 1px solid rgba(52, 191, 255, 0.4);
+      border-radius: var(--radius-pill);
+      background: rgba(52, 191, 255, 0.12);
+      color: var(--color-cyan-100);
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+    }
   }
 
   &-uid {
