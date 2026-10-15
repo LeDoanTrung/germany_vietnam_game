@@ -12,6 +12,8 @@ import { prefersReducedMotion } from "../composables/useReducedMotion";
 
 const { availableOrders, myOrder, earnings, back, openOrder } = useGame();
 
+const takenByOther = (id: string) => statusOf(id) !== "available" && !claimOf(id)?.mine;
+
 const handleOpen = (id: string) => {
   if (drawing.value) return;
   sounds.tap();
@@ -124,13 +126,21 @@ onBeforeUnmount(() => timers.forEach((timer) => window.clearTimeout(timer)));
           },
         ]"
       >
-        <button type="button" class="orders-card-button" :disabled="drawing" @click="handleOpen(order.id)">
+        <!-- Someone else's order is locked: nothing to do there for this player. -->
+        <button
+          type="button"
+          class="orders-card-button"
+          :disabled="drawing || takenByOther(order.id)"
+          :aria-label="takenByOther(order.id) ? `Order ${order.number}, taken by ${claimOf(order.id)?.shipper}` : undefined"
+          @click="handleOpen(order.id)"
+        >
           <span class="orders-card-top">
             <span class="orders-card-number">
               Order {{ order.number }}
               <span v-if="claimOf(order.id)?.mine" class="orders-card-yours">Your order</span>
             </span>
-            <StatusBadge :status="statusOf(order.id)" />
+            <span v-if="takenByOther(order.id)" class="orders-card-locked">🔒 Taken</span>
+            <StatusBadge v-else :status="statusOf(order.id)" />
           </span>
 
           <span class="orders-card-shipper">
@@ -258,6 +268,16 @@ onBeforeUnmount(() => timers.forEach((timer) => window.clearTimeout(timer)));
       letter-spacing: 0.08em;
       text-transform: uppercase;
       color: var(--color-cyan-300);
+    }
+
+    &-locked {
+      padding: 4px 10px;
+      border-radius: var(--radius-pill);
+      border: 1px solid rgba(168, 196, 224, 0.4);
+      color: var(--color-text-300);
+      font-size: 12px;
+      font-weight: 700;
+      white-space: nowrap;
     }
 
     &-yours {

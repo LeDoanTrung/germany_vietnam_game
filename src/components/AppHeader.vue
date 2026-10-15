@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { muted, sounds, toggleMuted } from "../composables/useSound";
 import { formatVnd } from "../config/game";
+import { sosOpen } from "../composables/useSos";
 
 const props = withDefaults(
   defineProps<{
@@ -14,6 +15,11 @@ const props = withDefaults(
 );
 
 const emit = defineEmits<{ back: [] }>();
+
+const openSos = () => {
+  sounds.tap();
+  sosOpen.value = true;
+};
 
 const handleBack = () => {
   sounds.tap();
@@ -32,6 +38,10 @@ const handleBack = () => {
 
     <h1 v-if="props.title" class="app-header-title">{{ props.title }}</h1>
     <span v-else class="app-header-title" aria-hidden="true"></span>
+
+    <button type="button" class="app-header-sos" aria-label="SOS — get help in the WhatsApp group" @click="openSos">
+      SOS
+    </button>
 
     <span class="app-header-wallet mono" :aria-label="`Shift earnings: ${formatVnd(props.earnings)}`">
       {{ formatVnd(props.earnings) }}
@@ -107,6 +117,32 @@ const handleBack = () => {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+  }
+
+  // Red and always visible, so a lost player finds it without thinking.
+  &-sos {
+    flex-shrink: 0;
+    min-width: 52px;
+    height: 40px;
+    padding: 0 12px;
+    border: 2px solid #fff;
+    border-radius: var(--radius-pill);
+    background: var(--color-red-400);
+    color: #fff;
+    font-weight: 900;
+    font-size: 14px;
+    letter-spacing: 0.06em;
+    cursor: pointer;
+    box-shadow: 0 0 14px rgba(255, 93, 108, 0.55);
+
+    &:active {
+      transform: scale(0.94);
+    }
+  }
+
+  &-paper &-sos {
+    border-color: var(--color-poster-ink);
+    box-shadow: 2px 3px 0 var(--color-poster-ink);
   }
 
   &-paper &-icon {

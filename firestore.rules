@@ -4,15 +4,26 @@ rules_version = '2';
 //
 // Enforced on the server, so a modified browser can't break the game:
 //   - every phone signs in anonymously and gets its own uid
-//   - an order can be taken once (create only — never overwritten)
-//   - each phone can take one order per round
+//   - an order can be taken once, and each phone takes one order per round
 //   - only the player who took an order can mark it delivered
-//   - nothing can be deleted from the app (reset a round in the console)
+//   - a player can release their own order within 10 minutes of taking it
+//   - organisers (a document in /admins/{uid}, added by hand in the console)
+//     can release or deliver any order, reset the round, and set the
+//     unlock / join codes
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    function isAdmin() {
+      return request.auth != null
+        && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
     match /rounds/{round}/orders/{orderId} {
+      function playerPath(uid) {
+        return /databases/$(database)/documents/rounds/$(round)/players/$(uid);
+      }
+
       allow read: if request.auth != null;
 
       allow create: if request.auth != null
@@ -22,16 +33,25 @@ service cloud.firestore {
         && request.resource.data.shipper is string
         && request.resource.data.shipper.size() > 0
         && request.resource.data.shipper.size() <= 24
-        && !exists(/databases/$(database)/documents/rounds/$(round)/players/$(request.auth.uid))
-        && getAfter(/databases/$(database)/documents/rounds/$(round)/players/$(request.auth.uid)).data.orderId == orderId;
+        && request.resource.data.claimedAt == request.time
+        && !exists(playerPath(request.auth.uid))
+        && getAfter(playerPath(request.auth.uid)).data.orderId == orderId;
 
+      // The shipper confirms their own delivery; an organiser can do it for them.
       allow update: if request.auth != null
-        && resource.data.uid == request.auth.uid
         && resource.data.status == 'delivering'
         && request.resource.data.status == 'delivered'
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'deliveredAt']);
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'deliveredAt'])
+        && (resource.data.uid == request.auth.uid || isAdmin());
 
-      allow delete: if false;
+      // "Picked the wrong order": the shipper can give it back for 10 minutes,
+      // together with their player record (so they can take another).
+      allow delete: if isAdmin()
+        || (request.auth != null
+          && resource.data.uid == request.auth.uid
+          && resource.data.status == 'delivering'
+          && request.time < resource.data.claimedAt + duration.value(10, 'm')
+          && !existsAfter(playerPath(request.auth.uid)));
     }
 
     // One document per phone: which order it took. Written in the same
@@ -42,7 +62,26 @@ service cloud.firestore {
         && request.auth.uid == uid
         && request.resource.data.keys().hasOnly(['name', 'orderId', 'claimedAt'])
         && existsAfter(/databases/$(database)/documents/rounds/$(round)/orders/$(request.resource.data.orderId));
-      allow update, delete: if false;
+      allow delete: if isAdmin()
+        || (request.auth != null
+          && request.auth.uid == uid
+          && !existsAfter(/databases/$(database)/documents/rounds/$(round)/orders/$(resource.data.orderId)));
+      allow update: if false;
+    }
+
+    // Unlock code and join code, set by organisers from the organiser page.
+    match /rounds/{round}/settings/{doc} {
+      allow read: if request.auth != null;
+      allow write: if isAdmin()
+        && request.resource.data.keys().hasOnly(['unlockCode', 'joinCode'])
+        && request.resource.data.unlockCode is string
+        && request.resource.data.joinCode is string;
+    }
+
+    // Who is an organiser. Created by hand in the console, never from the app.
+    match /admins/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+      allow write: if false;
     }
   }
 }

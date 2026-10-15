@@ -1,10 +1,12 @@
 <script setup lang="ts">
-import { computed, onMounted, watch, type Component } from "vue";
+import { computed, defineAsyncComponent, onBeforeUnmount, onMounted, ref, watch, type Component } from "vue";
 import HomeScreen from "./screens/HomeScreen.vue";
 import OrdersScreen from "./screens/OrdersScreen.vue";
 import OrderScreen from "./screens/OrderScreen.vue";
 import CongratsPopup from "./components/CongratsPopup.vue";
 import Snackbar from "./components/Snackbar.vue";
+import StatusBanners from "./components/StatusBanners.vue";
+import SosSheet from "./components/SosSheet.vue";
 import { connectClaims, useGame, type ScreenName } from "./store/game";
 import { sounds } from "./composables/useSound";
 
@@ -22,9 +24,21 @@ const screenKey = computed(() => `${state.screen}:${state.orderId ?? ""}`);
 
 watch(screenKey, () => sounds.whoosh());
 
+// The organiser page lives at <game URL>#organiser. Loaded only when opened.
+const OrganiserScreen = defineAsyncComponent(() => import("./screens/OrganiserScreen.vue"));
+const isOrganiserPage = ref(location.hash === "#organiser");
+const syncRoute = () => (isOrganiserPage.value = location.hash === "#organiser");
+window.addEventListener("hashchange", syncRoute);
+onBeforeUnmount(() => window.removeEventListener("hashchange", syncRoute));
+
 // Start listening for which orders are taken straight away, so the list is
 // up to date by the time the player gets there.
-onMounted(() => void connectClaims());
+onMounted(() => {
+  if (!isOrganiserPage.value) void connectClaims();
+});
+watch(isOrganiserPage, (organiserPage) => {
+  if (!organiserPage) void connectClaims();
+});
 
 // Fixed positions so the particles don't jump around on re-render.
 const PARTICLES = Array.from({ length: 14 }, (_, index) => ({
@@ -36,8 +50,9 @@ const PARTICLES = Array.from({ length: 14 }, (_, index) => ({
 </script>
 
 <template>
-  <div class="app">
-    <div class="app-phone">
+  <OrganiserScreen v-if="isOrganiserPage" />
+  <div v-else class="app">
+    <div id="phone" class="app-phone">
       <div class="app-world" aria-hidden="true">
         <div class="app-floor"></div>
         <span
@@ -63,12 +78,15 @@ const PARTICLES = Array.from({ length: 14 }, (_, index) => ({
       <!-- Lives at phone level so it covers the frame, not the whole browser window. -->
       <CongratsPopup />
       <Snackbar />
+      <SosSheet />
+      <StatusBanners />
     </div>
   </div>
 </template>
 
 <style scoped lang="scss">
 .app {
+  min-height: 100vh; // fallback: iOS < 15.4 has no dvh
   min-height: 100dvh;
   display: flex;
   align-items: center;
@@ -82,6 +100,7 @@ const PARTICLES = Array.from({ length: 14 }, (_, index) => ({
   &-phone {
     position: relative;
     width: 100%;
+    height: 100vh; // fallback: iOS < 15.4 has no dvh
     height: 100dvh;
     overflow: hidden;
     background: linear-gradient(180deg, var(--color-bg-800) 0%, var(--color-bg-700) 100%);
@@ -93,6 +112,7 @@ const PARTICLES = Array.from({ length: 14 }, (_, index) => ({
 
     &-phone {
       width: 400px;
+      height: min(860px, calc(100vh - 48px));
       height: min(860px, calc(100dvh - 48px));
       border-radius: 44px;
       border: 1px solid rgba(129, 216, 255, 0.35);

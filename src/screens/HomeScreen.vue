@@ -18,15 +18,55 @@ import { prefersReducedMotion } from "../composables/useReducedMotion";
 //
 // Flow: type your name → START → the notification drops in → tap → order list.
 
-const { state, availableOrders, deliveredOrders, myOrder, earnings, go, start, openOrder, canReset, resetRound } =
-  useGame();
+const {
+  state,
+  availableOrders,
+  deliveredOrders,
+  myOrder,
+  earnings,
+  go,
+  start,
+  changeName,
+  nameInUse,
+  joinCodeRequired,
+  joinCodeMatches,
+  openOrder,
+  canReset,
+  resetRound,
+  showNotice,
+} = useGame();
 
 const nameInput = ref(state.playerName);
-const canStart = computed(() => nameInput.value.trim().length > 0);
+const joinCodeInput = ref("");
+const canStart = computed(() => nameInput.value.trim().length > 0 && (!joinCodeRequired.value || joinCodeInput.value.trim().length > 0));
+
+/** Name already on someone's order: ask once before going ahead with it. */
+const duplicateWarned = ref("");
+const showDuplicateWarning = computed(
+  () => duplicateWarned.value !== "" && duplicateWarned.value === nameInput.value.trim(),
+);
 
 const handleStart = () => {
   if (!canStart.value) return;
-  start(nameInput.value);
+  if (!joinCodeMatches(joinCodeInput.value)) {
+    sounds.tap();
+    showNotice("That event code isn't right — ask the organiser.");
+    return;
+  }
+  const name = nameInput.value.trim();
+  if (nameInUse(name) && duplicateWarned.value !== name) {
+    sounds.tap();
+    duplicateWarned.value = name;
+    return;
+  }
+  start(name);
+};
+
+const handleChangeName = () => {
+  sounds.tap();
+  nameInput.value = state.playerName;
+  duplicateWarned.value = "";
+  changeName();
 };
 
 const allDelivered = computed(() => deliveredOrders.value.length === ORDERS.length);
@@ -115,6 +155,23 @@ const openMyOrder = () => {
                 required
               />
             </label>
+            <p v-if="showDuplicateWarning" class="home-warning" role="alert">
+              Someone called <b>{{ nameInput.trim() }}</b> already took an order. Add your last initial (e.g.
+              <b>{{ nameInput.trim() }} T.</b>) so nobody mixes you up — or tap START again to keep it.
+            </p>
+            <label v-if="joinCodeRequired" class="home-name">
+              <span class="home-name-label">Event code</span>
+              <input
+                v-model="joinCodeInput"
+                class="home-name-input home-name-input-code"
+                type="text"
+                maxlength="16"
+                placeholder="From the organiser"
+                autocapitalize="characters"
+                autocomplete="off"
+                enterkeyhint="go"
+              />
+            </label>
             <GameButton variant="crayon" class="home-start" type="submit" :disabled="!canStart">START</GameButton>
           </form>
 
@@ -130,7 +187,10 @@ const openMyOrder = () => {
               <p class="home-frame-hint">You're delivering Order {{ myOrder.number }}.</p>
               <GameButton variant="crayon" block @click="openMyOrder">Open my order</GameButton>
             </template>
-            <p v-else class="home-frame-hint home-frame-hint-strong">↑ Tap the notification above</p>
+            <template v-else>
+              <p class="home-frame-hint home-frame-hint-strong">↑ Tap the notification above</p>
+              <button type="button" class="home-reset" @click="handleChangeName">Not {{ state.playerName }}? Change name</button>
+            </template>
           </template>
 
           <dl v-if="state.started" class="home-stats">
@@ -376,6 +436,25 @@ const openMyOrder = () => {
         box-shadow: 3px 4px 0 var(--color-poster-red);
       }
     }
+  }
+
+  &-name-input-code {
+    font-family: var(--font-mono);
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+
+  &-warning {
+    max-width: 300px;
+    padding: 8px 12px;
+    border: 2px solid var(--color-poster-ink);
+    border-radius: 10px 14px 10px 14px;
+    background: #fff4d6;
+    font-family: var(--font-hand);
+    font-weight: 600;
+    font-size: 13px;
+    line-height: 1.35;
+    color: #3b2a00;
   }
 
   &-greeting {

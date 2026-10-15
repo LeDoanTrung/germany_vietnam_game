@@ -21,7 +21,10 @@ const props = defineProps<{ status: OrderStatus }>();
   gap: 6px;
   padding: 4px 10px;
   border-radius: var(--radius-pill);
+  // Plain fallbacks first: color-mix needs iOS 16.2+.
+  border: 1px solid var(--tone);
   border: 1px solid color-mix(in srgb, var(--tone) 60%, transparent);
+  background: rgba(255, 255, 255, 0.06);
   background: color-mix(in srgb, var(--tone) 14%, transparent);
   color: var(--tone);
   font-size: 12px;

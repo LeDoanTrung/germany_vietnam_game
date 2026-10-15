@@ -34,28 +34,51 @@ export const GAME = {
   appName: "Shipper App",
 };
 
+/** SOS button: lost or in trouble → open the group's WhatsApp chat. */
+export const SOS = {
+  whatsappGroupUrl: "https://chat.whatsapp.com/EeG8CNcSBSO9e3Y4491HNF?mode=gi_t",
+};
+
 export const DELIVERY = {
   /**
    * "Confirm delivered" unlocks within this distance of the destination.
    * Generous on purpose: indoors, phone GPS is often off by tens of metres.
    */
   radiusMeters: 100,
-  /**
-   * Organiser override, for a phone with location off or bad GPS: the
-   * organiser reads this out and the player types it in. It ships in the page,
-   * so it stops casual skipping, not a determined player. Change it before the event.
-   */
-  unlockCode: "KLU2026",
+  // The organiser unlock code (for a phone with location off or bad GPS) is
+  // set on the organiser page, not here, so it never sits in the public repo.
 };
+
+export type GateInfo = {
+  number: number;
+  /** One line telling players how to find the gate, e.g. "Main gate on Ly Thuong Kiet St". */
+  hint: string;
+  /** [latitude, longitude] of the gate, or null to leave it off the map. */
+  coords: [number, number] | null;
+};
+
+/**
+ * TO CONFIRM WITH THE CLIENT: how to find each gate of HCMC University of
+ * Technology. Left empty on purpose rather than guessed — an empty hint or
+ * null coords simply isn't shown.
+ */
+export const GATE_INFO: GateInfo[] = [
+  { number: 1, hint: "", coords: null },
+  { number: 2, hint: "", coords: null },
+  { number: 3, hint: "", coords: null },
+];
+
+export const gateInfo = (gate: number) => GATE_INFO.find((info) => info.number === gate);
 
 /**
  * One order per person in the group. Players pick an order themselves (or use
  * the random draw); once someone takes an order nobody else can.
  */
-export const ORDER_COUNT = 12;
+// ~12 people in the group, plus two spares for late joiners or a mistaken order.
+export const ORDER_COUNT = 14;
 
 /** Every order starts at one of these gates of the host university. */
-const GATES = [1, 2, 3];
+const GATES = GATE_INFO.map((info) => info.number);
 
 // What's in each parcel. Dealt out in turn, so the list can be shorter than ORDER_COUNT.
 const PARCELS: { item: string; quantity: number; reward: number; note?: string }[] = [

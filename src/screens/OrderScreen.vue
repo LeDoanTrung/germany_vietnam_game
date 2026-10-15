@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, defineAsyncComponent, ref, watch } from "vue";
+import { computed, defineAsyncComponent, onBeforeUnmount, ref, watch } from "vue";
 import AppHeader from "../components/AppHeader.vue";
 import HoloPanel from "../components/HoloPanel.vue";
 import ScrambleText from "../components/ScrambleText.vue";
@@ -9,7 +9,10 @@ import RouteMap from "../components/RouteMap.vue";
 import InfoRow from "../components/InfoRow.vue";
 import ActionBar from "../components/ActionBar.vue";
 import GameButton from "../components/GameButton.vue";
-import { DELIVERY, formatVnd } from "../config/game";
+import LocationHelp from "../components/LocationHelp.vue";
+import SafetySheet from "../components/SafetySheet.vue";
+import { DELIVERY, formatVnd, gateInfo } from "../config/game";
+import { RELEASE_WINDOW_MS } from "../services/claims";
 import { ROUTE, type LatLng } from "../config/route";
 import { statusSentence } from "../config/status";
 import { claimOf, statusOf, useGame } from "../store/game";
@@ -24,7 +27,19 @@ const LiveMap = defineAsyncComponent(() => import("../components/LiveMap.vue"));
 // One frame for the whole order, as the client described it: "Accept order"
 // takes it (nobody else can afterwards) and shows where to wait; then the ride,
 // and "Confirm delivered" opens the congrats pop-up.
-const { state, currentOrder, myOrder, earnings, back, acceptOrder, confirmDelivered, openOrder, showNotice } = useGame();
+const {
+  state,
+  currentOrder,
+  myOrder,
+  earnings,
+  back,
+  acceptOrder,
+  confirmDelivered,
+  canRelease,
+  releaseOrder,
+  openOrder,
+  showNotice,
+} = useGame();
 
 const status = computed(() => (currentOrder.value ? statusOf(currentOrder.value.id) : "available"));
 const claim = computed(() => (currentOrder.value ? claimOf(currentOrder.value.id) : undefined));
@@ -89,8 +104,15 @@ const canConfirm = computed(() => nearDestination.value || organiserUnlocked.val
 const showCodeForm = ref(false);
 const codeInput = ref("");
 
+// The code is set by the organiser on the organiser page (shared through Firebase).
 const submitCode = () => {
-  if (codeInput.value.trim().toUpperCase() !== DELIVERY.unlockCode.toUpperCase()) {
+  const expected = state.settings.unlockCode.trim().toUpperCase();
+  if (!expected) {
+    sounds.tap();
+    showNotice("The organiser hasn't set an unlock code yet.");
+    return;
+  }
+  if (codeInput.value.trim().toUpperCase() !== expected) {
     sounds.tap();
     showNotice("That code isn't right — ask the organiser again.");
     return;
@@ -114,7 +136,74 @@ const handleTurnOnLocation = () => {
 const handleDelivered = () => {
   if (!canConfirm.value) return;
   sounds.success();
-  void confirmDelivered();
+  confirmDelivered();
+};
+
+// ---- Release ("picked the wrong order") ------------------------------------
+
+// Ticks so the "x min left" countdown and the button's disappearance stay current.
+const now = ref(Date.now());
+const clock = window.setInterval(() => (now.value = Date.now()), 15000);
+onBeforeUnmount(() => window.clearInterval(clock));
+
+// Re-read the clock when the order is taken, so the countdown starts at 10 min, not 11.
+watch(
+  () => claim.value?.claimedAt,
+  () => (now.value = Date.now()),
+);
+
+const releasable = computed(() => !!currentOrder.value && canRelease(currentOrder.value.id, now.value));
+const releaseMinutesLeft = computed(() => {
+  const claimedAt = claim.value?.claimedAt ?? now.value;
+  const left = Math.ceil((claimedAt + RELEASE_WINDOW_MS - now.value) / 60000);
+  return Math.min(RELEASE_WINDOW_MS / 60000, Math.max(1, left));
+});
+
+// Two taps, so a stray touch can't throw the order away.
+const confirmingRelease = ref(false);
+let releaseTimer = 0;
+const handleRelease = () => {
+  sounds.tap();
+  if (!confirmingRelease.value) {
+    confirmingRelease.value = true;
+    window.clearTimeout(releaseTimer);
+    releaseTimer = window.setTimeout(() => (confirmingRelease.value = false), 4000);
+    return;
+  }
+  confirmingRelease.value = false;
+  void releaseOrder();
+};
+
+// ---- Gate details and the one-time safety sheet ----------------------------
+
+const gate = computed(() => (currentOrder.value ? gateInfo(currentOrder.value.gate) : undefined));
+
+const SAFETY_KEY = "shipper-game:safety-seen";
+const safetySeen = () => {
+  try {
+    return localStorage.getItem(SAFETY_KEY) === "1";
+  } catch {
+    return false;
+  }
+};
+const safetyOpen = ref(false);
+
+// Right after the player takes the order (not when reopening it later).
+watch(
+  () => [isMine.value, status.value] as const,
+  ([mine, current], previous) => {
+    const justTaken = mine && current === "delivering" && previous?.[1] === "available";
+    if (justTaken && !safetySeen()) safetyOpen.value = true;
+  },
+);
+
+const closeSafety = () => {
+  safetyOpen.value = false;
+  try {
+    localStorage.setItem(SAFETY_KEY, "1");
+  } catch {
+    // Shown again next time; harmless.
+  }
 };
 
 const setMapView = (view: "live" | "animated") => {
@@ -152,6 +241,7 @@ const setMapView = (view: "live" | "animated") => {
         <span>
           <span class="order-gate-label">Your pick-up point</span>
           <span class="order-gate-text">Wait at <b>Gate {{ currentOrder.gate }}</b></span>
+          <span v-if="gate?.hint" class="order-gate-hint">{{ gate.hint }}</span>
           <span class="order-gate-place">{{ currentOrder.from.address }}</span>
         </span>
       </HoloPanel>
@@ -161,7 +251,12 @@ const setMapView = (view: "live" | "animated") => {
         <button type="button" :aria-pressed="mapView === 'animated'" @click="setMapView('animated')">✨ Animation</button>
       </div>
 
-      <LiveMap v-if="showLiveMap" :gate="currentOrder.gate" :order-id="currentOrder.id" />
+      <LiveMap
+        v-if="showLiveMap"
+        :gate="currentOrder.gate"
+        :gate-coords="gate?.coords ?? null"
+        :order-id="currentOrder.id"
+      />
       <RouteMap v-else :order="currentOrder" :mode="MAP_MODE[status]" />
 
       <HoloPanel :delay="0.2">
@@ -212,6 +307,7 @@ const setMapView = (view: "live" | "animated") => {
             📍 No GPS signal. Move into the open, or ask the organiser for the unlock code.
           </template>
           <template v-else>🔒 "Confirm delivered" unlocks when you reach {{ currentOrder.to.name }}.</template>
+          <LocationHelp v-if="gpsStatus === 'denied' || gpsStatus === 'unavailable'" class="order-location-help" />
         </div>
 
         <GameButton v-if="gpsStatus === 'idle' && !canConfirm" block @click="handleTurnOnLocation">
@@ -257,6 +353,18 @@ const setMapView = (view: "live" | "animated") => {
             Can't get a GPS fix? Enter the organiser code
           </button>
         </template>
+
+        <!-- Picked the wrong order: give it back while still at the gate -->
+        <button
+          v-if="releasable"
+          type="button"
+          :class="['order-release', { 'order-release-confirm': confirmingRelease }]"
+          :disabled="state.busy"
+          @click="handleRelease"
+        >
+          <template v-if="confirmingRelease">Tap again to release Order {{ currentOrder.number }}</template>
+          <template v-else>Wrong order? Release it ({{ releaseMinutesLeft }} min left)</template>
+        </button>
       </template>
 
       <!-- Someone else's order, or finished -->
@@ -265,6 +373,10 @@ const setMapView = (view: "live" | "animated") => {
         <GameButton variant="ghost" block @click="back">Back to orders</GameButton>
       </template>
     </ActionBar>
+
+    <Teleport to="#phone">
+      <SafetySheet :open="safetyOpen" @close="closeSafety" />
+    </Teleport>
   </div>
 </template>
 
@@ -319,6 +431,7 @@ const setMapView = (view: "live" | "animated") => {
     padding: 8px 12px;
     border-radius: var(--radius-sm);
     border-left: 3px solid var(--tone);
+    background: rgba(255, 255, 255, 0.06); // fallback: color-mix needs iOS 16.2+
     background: color-mix(in srgb, var(--tone) 12%, transparent);
     font-size: 15px;
     font-weight: 700;
@@ -448,6 +561,35 @@ const setMapView = (view: "live" | "animated") => {
         outline: none;
         border-color: var(--color-amber-400);
       }
+    }
+  }
+
+  &-location-help {
+    margin-top: 6px;
+  }
+
+  &-gate-hint {
+    display: block;
+    margin-top: 2px;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--color-amber-300);
+  }
+
+  &-release {
+    min-height: 40px;
+    border: 1px dashed rgba(255, 93, 108, 0.5);
+    border-radius: var(--radius-pill);
+    background: transparent;
+    color: var(--color-text-300);
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+
+    &-confirm {
+      border-style: solid;
+      background: var(--color-red-400);
+      color: #fff;
     }
   }
 

@@ -21,7 +21,12 @@ import { sounds } from "../composables/useSound";
 // Map data © OpenStreetMap contributors. Tiles come straight from OSM, which is
 // fine for a group this size; no routing API is called.
 
-const props = defineProps<{ gate: number; orderId: string }>();
+const props = defineProps<{
+  gate: number;
+  /** Exact spot of the player's gate, when the organiser has provided it. */
+  gateCoords: LatLng | null;
+  orderId: string;
+}>();
 
 /** Further than this from the planned route counts as a different route. */
 const OFF_ROUTE_M = 80;
@@ -82,7 +87,7 @@ onMounted(() => {
   trailGlow = L.polyline(trail, { color: "#34bfff", weight: 12, opacity: 0.25, lineCap: "round", lineJoin: "round" }).addTo(map);
   trailLine = L.polyline(trail, { color: "#34bfff", weight: 5, opacity: 1, lineCap: "round", lineJoin: "round" }).addTo(map);
 
-  L.marker(ROUTE.start.coords, { icon: pin("live-map-pin-start", "A"), keyboard: false })
+  L.marker(props.gateCoords ?? ROUTE.start.coords, { icon: pin("live-map-pin-start", String(props.gate)), keyboard: false })
     .bindTooltip(`Start · Gate ${props.gate}`, { direction: "top", offset: [0, -16] })
     .addTo(map);
   L.marker(ROUTE.destination.coords, { icon: pin("live-map-pin-end", "🏁"), keyboard: false })
@@ -225,6 +230,9 @@ const recenter = () => {
 <style scoped lang="scss">
 .live-map {
   position: relative;
+  // Leaflet stacks its panes at z-index 400–1000; keep them inside the map so
+  // they can't cover the sticky action bar while the page scrolls under it.
+  isolation: isolate;
   margin: 0;
   border-radius: var(--radius-md);
   border: 1px solid rgba(52, 191, 255, 0.35);
