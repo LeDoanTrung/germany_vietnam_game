@@ -82,20 +82,20 @@ onBeforeUnmount(() => {
 
         <ScrambleText id="congrats-title" text="Congratulations!" as="h2" class="congrats-title" :delay="0.3" />
         <p class="congrats-copy">
-          <strong>{{ currentOrder.shipper }}</strong> đã giao thành công Đơn {{ currentOrder.number }} —
-          {{ currentOrder.item }} đến {{ currentOrder.to.name }}.
+          <strong>{{ currentOrder.shipper }}</strong> delivered Order {{ currentOrder.number }} —
+          {{ currentOrder.item }} to {{ currentOrder.to.name }}.
         </p>
 
         <div class="congrats-reward">
-          <p class="congrats-reward-label">Phí ship nhận được</p>
+          <p class="congrats-reward-label">Shipping fee earned</p>
           <p class="congrats-reward-value mono" :aria-label="formatVnd(currentOrder.reward)">+{{ formatVnd(shownReward) }}</p>
         </div>
 
         <div class="congrats-actions">
           <GameButton ref="primaryRef" block @click="go('orders', null)">
-            {{ pendingOrders.length > 0 ? `Về danh sách đơn (${pendingOrders.length} còn lại)` : "Về danh sách đơn" }}
+            {{ pendingOrders.length > 0 ? `Back to orders (${pendingOrders.length} left)` : "Back to orders" }}
           </GameButton>
-          <GameButton variant="ghost" block @click="go('home', null)">Về màn hình chính</GameButton>
+          <GameButton variant="ghost" block @click="go('home', null)">Back to home</GameButton>
         </div>
       </HoloPanel>
     </div>

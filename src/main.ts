@@ -1,6 +1,6 @@
 import { createApp } from "vue";
-// Be Vietnam Pro ships a full Vietnamese subset, so diacritics like ứ, ỉ, ộ
-// render in the same face as the rest of the word.
+// Be Vietnam Pro also covers Vietnamese diacritics, so player names with
+// accents (the group is German–Vietnamese) render in the same face.
 import "@fontsource/be-vietnam-pro/400.css";
 import "@fontsource/be-vietnam-pro/700.css";
 import "@fontsource/be-vietnam-pro/900.css";

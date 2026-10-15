@@ -23,7 +23,7 @@ const handleBack = () => {
 
 <template>
   <header :class="['app-header', `app-header-${props.tone}`]">
-    <button v-if="props.showBack" type="button" class="app-header-icon" aria-label="Quay lại" @click="handleBack">
+    <button v-if="props.showBack" type="button" class="app-header-icon" aria-label="Back" @click="handleBack">
       <svg viewBox="0 0 24 24" aria-hidden="true">
         <path d="M15 5 8 12l7 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" />
       </svg>
@@ -33,14 +33,14 @@ const handleBack = () => {
     <h1 v-if="props.title" class="app-header-title">{{ props.title }}</h1>
     <span v-else class="app-header-title" aria-hidden="true"></span>
 
-    <span class="app-header-wallet mono" :aria-label="`Thu nhập ca: ${formatVnd(props.earnings)}`">
+    <span class="app-header-wallet mono" :aria-label="`Shift earnings: ${formatVnd(props.earnings)}`">
       {{ formatVnd(props.earnings) }}
     </span>
 
     <button
       type="button"
       class="app-header-icon"
-      :aria-label="muted ? 'Bật âm thanh' : 'Tắt âm thanh'"
+      :aria-label="muted ? 'Turn sound on' : 'Turn sound off'"
       :aria-pressed="!muted"
       @click="toggleMuted"
     >

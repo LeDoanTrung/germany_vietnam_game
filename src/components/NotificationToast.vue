@@ -68,7 +68,7 @@ const handleOpen = () => {
     <span class="toast-body">
       <span class="toast-meta">
         <span class="toast-app">{{ props.appName }}</span>
-        <span class="toast-time">bây giờ</span>
+        <span class="toast-time">now</span>
       </span>
       <span class="toast-title">{{ props.title }}</span>
       <span class="toast-message">{{ props.message }}</span>

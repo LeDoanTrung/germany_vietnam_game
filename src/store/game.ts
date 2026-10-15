@@ -5,9 +5,9 @@ import { ORDERS, type Order } from "../config/game";
 // reload doesn't wipe the round — no server, no API calls.
 
 /**
- * dispatching — "Đang điều phối shipper <tên>" (every order starts here)
- * delivering  — the shipper pressed "Nhận đơn"
- * delivered   — the shipper pressed "Xác nhận đã giao hàng"
+ * dispatching — "Dispatching shipper <name>" (every order starts here)
+ * delivering  — the shipper pressed "Accept order"
+ * delivered   — the shipper pressed "Confirm delivered"
  */
 export type OrderStatus = "dispatching" | "delivering" | "delivered";
 
@@ -68,13 +68,13 @@ export const useGame = () => {
 
   const openOrder = (id: string) => go("order", id);
 
-  /** "Nhận đơn" */
+  /** "Accept order" */
   const acceptOrder = () => {
     if (!state.orderId) return;
     state.statuses[state.orderId] = "delivering";
   };
 
-  /** "Xác nhận đã giao hàng" */
+  /** "Confirm delivered" */
   const confirmDelivered = () => {
     if (!state.orderId) return;
     state.statuses[state.orderId] = "delivered";

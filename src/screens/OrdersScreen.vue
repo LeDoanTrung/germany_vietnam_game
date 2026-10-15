@@ -18,7 +18,7 @@ const handleOpen = (id: string) => {
   openOrder(id);
 };
 
-// "Bốc thăm" — a highlight hops between the open orders, slowing down like a
+// Random draw — a highlight hops between the open orders, slowing down like a
 // prize wheel, and lands on one at random.
 const drawing = ref(false);
 const highlightedId = ref<string | null>(null);
@@ -76,11 +76,11 @@ onBeforeUnmount(() => timers.forEach((timer) => window.clearTimeout(timer)));
 
 <template>
   <div class="orders">
-    <AppHeader :title="`Danh sách đơn (${ORDERS.length})`" show-back :earnings="earnings" @back="back" />
+    <AppHeader :title="`Orders (${ORDERS.length})`" show-back :earnings="earnings" @back="back" />
 
     <div class="orders-intro">
       <p class="orders-intro-copy">
-        Tìm đơn có tên bạn — hoặc để hệ thống bốc thăm. Còn <b>{{ pendingOrders.length }}</b> đơn cần xử lý.
+        Find the order with your name — or let the app draw one. <b>{{ pendingOrders.length }}</b> orders left to handle.
       </p>
       <GameButton
         variant="ghost"
@@ -95,7 +95,7 @@ onBeforeUnmount(() => timers.forEach((timer) => window.clearTimeout(timer)));
           <circle cx="15.5" cy="15.5" r="1.6" fill="currentColor" />
           <circle cx="12" cy="12" r="1.6" fill="currentColor" />
         </svg>
-        {{ drawing ? "Đang bốc thăm..." : "Bốc thăm ngẫu nhiên" }}
+        {{ drawing ? "Drawing..." : "Random draw" }}
       </GameButton>
     </div>
 
@@ -118,14 +118,14 @@ onBeforeUnmount(() => timers.forEach((timer) => window.clearTimeout(timer)));
       >
         <button type="button" class="orders-card-button" :disabled="drawing" @click="handleOpen(order.id)">
           <span class="orders-card-top">
-            <span class="orders-card-number">Đơn {{ order.number }}</span>
+            <span class="orders-card-number">Order {{ order.number }}</span>
             <StatusBadge :status="statusOf(order.id)" />
           </span>
 
           <span class="orders-card-shipper">
             <span class="orders-card-avatar" aria-hidden="true">{{ order.shipper.charAt(0) }}</span>
             <span>
-              <span class="orders-card-shipper-label">Trạng thái</span>
+              <span class="orders-card-shipper-label">Status</span>
               <span class="orders-card-shipper-name">{{ statusSentence(statusOf(order.id), order.shipper) }}</span>
             </span>
           </span>

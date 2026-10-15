@@ -8,7 +8,7 @@ const props = defineProps<{
   current: number;
 }>();
 
-const STEPS = ["Điều phối", "Nhận đơn", "Đang giao", "Đã giao"];
+const STEPS = ["Dispatch", "Accept", "Delivering", "Delivered"];
 
 const fillRef = ref<HTMLElement | null>(null);
 
@@ -41,7 +41,7 @@ watch(
     <span class="stepper-track" aria-hidden="true">
       <span ref="fillRef" class="stepper-fill"></span>
     </span>
-    <ol class="stepper-list" :aria-label="`Tiến độ: ${STEPS[Math.min(props.current, STEPS.length - 1)]}`">
+    <ol class="stepper-list" :aria-label="`Progress: ${STEPS[Math.min(props.current, STEPS.length - 1)]}`">
     <li
       v-for="(step, index) in STEPS"
       :key="step"

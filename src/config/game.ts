@@ -11,7 +11,7 @@ export type Place = {
 
 export type Order = {
   id: string;
-  /** Number shown to the player, e.g. "Đơn 1". */
+  /** Number shown to the player, e.g. "Order 1". */
   number: number;
   item: string;
   quantity: number;
@@ -19,7 +19,7 @@ export type Order = {
   from: Place;
   /** Drop-off point. */
   to: Place;
-  /** "C" — the person dispatched to collect this order. */
+  /** The player dispatched to deliver this order. */
   shipper: string;
   distanceKm: number;
   /** Shipping fee earned, in VND. */
@@ -29,16 +29,16 @@ export type Order = {
 
 export const GAME = {
   // Placeholder — replace with the name the client picks.
-  title: "Siêu Shipper",
+  title: "Super Shipper",
   /** Text on the blue brush-stroke banner under the title. */
   banner: "Germany – Vietnam",
-  subtitle: "Nhập vai shipper — giao hàng tận tay",
+  subtitle: "Play the shipper — deliver every order!",
   appName: "Shipper App",
 };
 
 // Placeholder names — replace with the real list of people in the group.
 // Add or remove names and the number of orders follows automatically.
-export const PLAYERS: string[] = ["An", "Bình", "Chi", "Dũng", "Giang", "Hà", "Khoa", "Linh", "Minh", "Nam"];
+export const PLAYERS: string[] = ["Alex", "Ben", "Chloe", "Daniel", "Emma", "Felix", "Grace", "Hannah", "Ian", "Julia"];
 
 type OrderTemplate = Omit<Order, "id" | "number" | "shipper">;
 
@@ -46,47 +46,47 @@ type OrderTemplate = Omit<Order, "id" | "number" | "shipper">;
 // player list — the details just repeat.
 const ORDER_POOL: OrderTemplate[] = [
   {
-    item: "Ly bia",
+    item: "Glass of beer",
     quantity: 1,
-    from: { label: "A", name: "Quán Bia A", address: "12 Lê Lợi, Quận 1" },
-    to: { label: "B", name: "Nhà khách B", address: "88 Nguyễn Trãi, Quận 5" },
+    from: { label: "A", name: "Beer Bar A", address: "12 Harbor Street, District 1" },
+    to: { label: "B", name: "Guest House B", address: "88 River Road, District 5" },
     distanceKm: 4.2,
     reward: 25000,
-    note: "Hàng dễ vỡ — giữ thẳng ly.",
+    note: "Fragile — keep the glass upright.",
   },
   {
-    item: "Thùng bia 24 lon",
+    item: "Case of 24 beers",
     quantity: 2,
-    from: { label: "A", name: "Đại lý A", address: "301 Cách Mạng Tháng 8, Quận 3" },
-    to: { label: "B", name: "Nhà hàng B", address: "19 Phan Xích Long, Phú Nhuận" },
+    from: { label: "A", name: "Wholesaler A", address: "301 Market Avenue, District 3" },
+    to: { label: "B", name: "Restaurant B", address: "19 Garden Street, District 7" },
     distanceKm: 6.8,
     reward: 42000,
   },
   {
-    item: "Bộ cốc thủy tinh",
+    item: "Set of glasses",
     quantity: 6,
-    from: { label: "A", name: "Cửa hàng A", address: "56 Hai Bà Trưng, Quận 1" },
-    to: { label: "B", name: "Căn hộ B", address: "2 Nguyễn Hữu Cảnh, Bình Thạnh" },
+    from: { label: "A", name: "Shop A", address: "56 Park Lane, District 1" },
+    to: { label: "B", name: "Apartment B", address: "2 Riverside Drive, District 2" },
     distanceKm: 3.5,
     reward: 30000,
-    note: "Gọi trước khi giao 10 phút.",
+    note: "Call 10 minutes before delivery.",
   },
   {
-    item: "Két nước ngọt",
+    item: "Crate of soft drinks",
     quantity: 1,
-    from: { label: "A", name: "Tạp hóa A", address: "77 Võ Văn Tần, Quận 3" },
-    to: { label: "B", name: "Văn phòng B", address: "135 Nam Kỳ Khởi Nghĩa, Quận 3" },
+    from: { label: "A", name: "Grocery A", address: "77 Station Road, District 3" },
+    to: { label: "B", name: "Office B", address: "135 Central Avenue, District 3" },
     distanceKm: 2.1,
     reward: 18000,
   },
   {
-    item: "Hộp bánh kem",
+    item: "Birthday cake",
     quantity: 1,
-    from: { label: "A", name: "Tiệm bánh A", address: "24 Pasteur, Quận 1" },
-    to: { label: "B", name: "Nhà riêng B", address: "61 Trần Quang Khải, Quận 1" },
+    from: { label: "A", name: "Bakery A", address: "24 Baker Street, District 1" },
+    to: { label: "B", name: "Home B", address: "61 Ocean Boulevard, District 1" },
     distanceKm: 2.9,
     reward: 22000,
-    note: "Giữ thăng bằng, không xếp chồng.",
+    note: "Keep it level — do not stack.",
   },
 ];
 
@@ -97,4 +97,4 @@ export const ORDERS: Order[] = PLAYERS.map((shipper, index) => ({
   shipper,
 }));
 
-export const formatVnd = (amount: number) => `${amount.toLocaleString("vi-VN")}đ`;
+export const formatVnd = (amount: number) => `${amount.toLocaleString("en-US")} VND`;

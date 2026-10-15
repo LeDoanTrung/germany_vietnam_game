@@ -1,47 +1,50 @@
 # Germany – Vietnam Shipper Game
 
-Web game nhập vai shipper, chạy hoàn toàn trên trình duyệt: không database, không gọi API.
-Tiến độ của mỗi người lưu trong `localStorage` trên chính máy của họ.
+A shipper role-play web game that runs entirely in the browser: no database, no API calls.
+Each player's progress is kept in `localStorage` on their own device. Designed for phones.
 
-## Luồng chơi
+## How it plays
 
-1. **Màn chính** (theme poster vẽ tay): tên game, rồi nút **START**.
-2. Bấm START thì hiện **chuông rung rung**. Bấm chuông, thông báo *"Có 10 đơn hàng đang cần xử lý"* rơi xuống.
-3. Bấm thông báo để mở **danh sách đơn**. Mỗi người trong đoàn có một đơn, trạng thái
-   *"Đang điều phối shipper [tên]"*. Có thể tìm đơn có tên mình hoặc bấm **Bốc thăm ngẫu nhiên**.
-4. Mở đơn: giao từ đâu tới đâu, nút **Nhận đơn**. Bấm xong thì map chạy từ điểm đầu đến điểm cuối,
-   trạng thái *"Đang giao hàng"*, kèm nút **Xác nhận đã giao hàng**.
-5. Bấm xác nhận sẽ hiện popup **Congratulations!**
+1. **Home screen** (hand-drawn poster theme): the game title, then a **START** button.
+2. START reveals a **shaking bell**. Tapping it drops in a notification: *"10 orders need handling"*.
+3. Tapping the notification opens the **order list**. Every player has one order, with the status
+   *"Dispatching shipper [name]"*. Players find the order with their name, or use **Random draw**.
+4. Inside an order: where it goes from and to, and an **Accept order** button. Accepting starts the animated
+   map from the start point to the end point, with the status *"Delivering"* and a **Confirm delivered** button.
+5. Confirming opens the **Congratulations!** pop-up.
 
-## Chạy local
+## Run locally
 
 ```bash
 npm install
 npm run dev      # http://localhost:3100
-npm run build    # typecheck + build ra dist/
+npm run build    # typecheck + production build into dist/
 ```
 
-## Sửa nội dung
+## Editing content
 
-Toàn bộ nội dung nằm trong `src/config/game.ts`:
+All content lives in `src/config/game.ts`:
 
-- `GAME.title`: tên game (hiện là tên tạm). `GAME.banner`: chữ trên băng rôn xanh. `GAME.subtitle`: dòng chữ vàng.
-- `PLAYERS`: danh sách tên người trong đoàn. **Số đơn = số tên**: thêm hoặc bớt tên thì số đơn tự đổi theo.
-- `ORDER_POOL`: món hàng, điểm đầu/điểm cuối, quãng đường, phí ship. Danh sách này chia lần lượt cho từng người,
-  nên ngắn hơn số người cũng được.
+- `GAME.title`: game name (currently a placeholder). `GAME.banner`: text on the blue banner. `GAME.subtitle`: the yellow line.
+- `PLAYERS`: names of the people in the group. **Number of orders = number of names**. Add or remove a name and the
+  order count follows.
+- `ORDER_POOL`: items, start/end points, distance, shipping fee. Orders are dealt from this pool in turn, so it can be
+  shorter than the player list.
 
-## Deploy lên GitHub Pages
+## Deploying to GitHub Pages
 
-Repo: https://github.com/LeDoanTrung/germany_vietnam_game
+Repository: https://github.com/LeDoanTrung/germany_vietnam_game
 
-1. Push code lên nhánh `main`. Workflow `.github/workflows/deploy.yml` tự build và đẩy lên nhánh `gh-pages`.
-2. Lần đầu: vào **Settings → Pages → Source: Deploy from a branch → `gh-pages` / root**.
-3. Trang chạy tại https://ledoantrung.github.io/germany_vietnam_game/
+1. Push to `main`. The workflow in `.github/workflows/deploy.yml` builds the site and publishes it to the `gh-pages` branch.
+2. First time only: **Settings → Pages → Source: Deploy from a branch → `gh-pages` / root**.
+3. The game is live at https://ledoantrung.github.io/germany_vietnam_game/
 
-## Ghi chú kỹ thuật
+## Technical notes
 
-- Vue 3 + Vite + TypeScript, animation bằng GSAP.
-- Màn chính dùng theme poster vẽ tay (minh hoạ SVG tự vẽ, filter vân sáp màu); các màn trong "app shipper" dùng giao diện hologram.
-- Âm thanh tổng hợp bằng Web Audio API nên không có file âm thanh nào đi kèm.
-- Font hỗ trợ đầy đủ tiếng Việt: Baloo 2, Mali, Be Vietnam Pro, Space Mono (đóng gói qua `@fontsource`).
-- Tôn trọng chế độ *giảm chuyển động* (`prefers-reduced-motion`) của hệ điều hành.
+- Vue 3 + Vite + TypeScript, animations with GSAP.
+- The home screen uses the hand-drawn poster theme (self-drawn SVG illustrations with a crayon texture filter); the
+  in-game "shipper app" screens use a hologram style.
+- Sounds are synthesised with the Web Audio API, so no audio files ship with the app.
+- Fonts (bundled via `@fontsource`): Baloo 2, Mali, Be Vietnam Pro, Space Mono. All include Vietnamese diacritics,
+  so accented player names render correctly.
+- Honours the operating system's *reduce motion* setting (`prefers-reduced-motion`).

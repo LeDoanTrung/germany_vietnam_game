@@ -25,7 +25,7 @@ const handleClick = () => {
   <button
     type="button"
     :class="['bell', `bell-${props.variant}`]"
-    :aria-label="`${props.count} thông báo mới`"
+    :aria-label="`${props.count} new notifications`"
     @click="handleClick"
   >
     <span class="bell-wave" aria-hidden="true"></span>

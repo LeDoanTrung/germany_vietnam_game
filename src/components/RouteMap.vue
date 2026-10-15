@@ -101,7 +101,7 @@ onBeforeUnmount(() => timeline?.kill());
     <svg
       viewBox="0 0 340 210"
       role="img"
-      :aria-label="`Bản đồ: từ ${props.order.from.name} đến ${props.order.to.name}`"
+      :aria-label="`Map: from ${props.order.from.name} to ${props.order.to.name}`"
     >
       <defs>
         <pattern :id="gridId" width="20" height="20" patternUnits="userSpaceOnUse">
@@ -170,7 +170,7 @@ onBeforeUnmount(() => timeline?.kill());
       <span class="route-caption-stop">
         <b>{{ props.order.from.label }}</b>
         <span>
-          <small>Điểm đầu</small>
+          <small>Start point</small>
           {{ props.order.from.name }}
         </span>
       </span>
@@ -178,7 +178,7 @@ onBeforeUnmount(() => timeline?.kill());
       <span class="route-caption-stop route-caption-stop-end">
         <b>{{ props.order.to.label }}</b>
         <span>
-          <small>Điểm cuối</small>
+          <small>End point</small>
           {{ props.order.to.name }}
         </span>
       </span>

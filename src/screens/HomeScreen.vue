@@ -44,8 +44,8 @@ onMounted(() => {
         <NotificationToast
           v-if="noticeOpen && pendingOrders.length > 0"
           :app-name="GAME.appName"
-          :title="`Có ${pendingOrders.length} đơn hàng đang cần xử lý`"
-          message="Nhấn để xem danh sách đơn"
+          :title="`${pendingOrders.length} orders need handling`"
+          message="Tap to see the order list"
           :badge="pendingOrders.length"
           @open="go('orders')"
         />
@@ -81,34 +81,34 @@ onMounted(() => {
               <path d="M2 30h12M6 38h10M0 46h10" class="home-scooter-speed" />
             </svg>
             <GameButton variant="crayon" class="home-start" @click="start">START</GameButton>
-            <p class="home-frame-hint">Nhấn START để bắt đầu ca giao hàng</p>
+            <p class="home-frame-hint">Tap START to begin your delivery shift</p>
           </template>
 
           <template v-else-if="pendingOrders.length > 0">
             <NotificationBell variant="paper" :count="pendingOrders.length" @open="noticeOpen = true" />
             <p class="home-frame-hint home-frame-hint-strong">
-              <template v-if="!noticeOpen">Bạn có thông báo mới — nhấn vào chuông!</template>
-              <template v-else>↑ Nhấn vào thông báo phía trên</template>
+              <template v-if="!noticeOpen">You have a new notification — tap the bell!</template>
+              <template v-else>↑ Tap the notification above</template>
             </p>
           </template>
 
           <template v-else>
-            <p class="home-finished-title">Hết đơn rồi! 🎉</p>
-            <p class="home-frame-hint">Cả đoàn đã giao xong toàn bộ đơn.</p>
-            <GameButton variant="crayon" block @click="resetRound">Chơi lại từ đầu</GameButton>
+            <p class="home-finished-title">All delivered! 🎉</p>
+            <p class="home-frame-hint">The whole team has delivered every order.</p>
+            <GameButton variant="crayon" block @click="resetRound">Play again</GameButton>
           </template>
 
           <dl v-if="state.started" class="home-stats">
             <div>
-              <dt>Cần xử lý</dt>
+              <dt>To handle</dt>
               <dd>{{ pendingOrders.length }}</dd>
             </div>
             <div>
-              <dt>Đã giao</dt>
+              <dt>Delivered</dt>
               <dd>{{ deliveredOrders.length }}</dd>
             </div>
             <div>
-              <dt>Thu nhập</dt>
+              <dt>Earnings</dt>
               <dd>{{ formatVnd(earnings) }}</dd>
             </div>
           </dl>
@@ -120,7 +120,7 @@ onMounted(() => {
           class="home-reset"
           @click="resetRound"
         >
-          Làm lại từ đầu
+          Start over
         </button>
       </main>
     </div>

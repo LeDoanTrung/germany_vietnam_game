@@ -14,8 +14,8 @@ import { statusSentence } from "../config/status";
 import { statusOf, useGame } from "../store/game";
 import { sounds } from "../composables/useSound";
 
-// One frame for the whole order, as the client described it: "Nhận đơn" turns
-// it into a live delivery, and "Xác nhận đã giao hàng" opens the congrats pop-up.
+// One frame for the whole order, as the client described it: "Accept order" turns
+// it into a live delivery, and "Confirm delivered" opens the congrats pop-up.
 const { currentOrder, earnings, back, acceptOrder, confirmDelivered } = useGame();
 
 const status = computed(() => (currentOrder.value ? statusOf(currentOrder.value.id) : "dispatching"));
@@ -36,7 +36,7 @@ const handleDelivered = () => {
 
 <template>
   <div v-if="currentOrder" class="order">
-    <AppHeader :title="`Đơn ${currentOrder.number}`" show-back :earnings="earnings" @back="back" />
+    <AppHeader :title="`Order ${currentOrder.number}`" show-back :earnings="earnings" @back="back" />
 
     <div class="order-content">
       <StatusStepper :current="STEP_FOR_STATUS[status]" />
@@ -45,11 +45,11 @@ const handleDelivered = () => {
       <HoloPanel :key="status" class="order-headline" :tone="status === 'delivered' ? 'green' : 'amber'">
         <StatusBadge :status="status" />
         <h2 class="order-title">
-          Giao <ScrambleText :text="currentOrder.item" class="order-title-item" :delay="0.15" />
+          Deliver <ScrambleText :text="currentOrder.item" class="order-title-item" :delay="0.15" />
           <small>× {{ currentOrder.quantity }}</small>
         </h2>
         <p class="order-route">
-          từ <b>{{ currentOrder.from.name }}</b> đến <b>{{ currentOrder.to.name }}</b>
+          from <b>{{ currentOrder.from.name }}</b> to <b>{{ currentOrder.to.name }}</b>
         </p>
         <p :class="['order-status', `order-status-${status}`]">
           {{ statusSentence(status, currentOrder.shipper)
@@ -61,18 +61,18 @@ const handleDelivered = () => {
 
       <HoloPanel :delay="0.2">
         <InfoRow label="Shipper" badge="🛵" highlight>{{ currentOrder.shipper }}</InfoRow>
-        <InfoRow label="Điểm đầu" :badge="currentOrder.from.label">
+        <InfoRow label="Start point" :badge="currentOrder.from.label">
           {{ currentOrder.from.name }}
           <small>{{ currentOrder.from.address }}</small>
         </InfoRow>
-        <InfoRow label="Điểm cuối" :badge="currentOrder.to.label">
+        <InfoRow label="End point" :badge="currentOrder.to.label">
           {{ currentOrder.to.name }}
           <small>{{ currentOrder.to.address }}</small>
         </InfoRow>
-        <InfoRow label="Quãng đường · Phí ship">
+        <InfoRow label="Distance · Shipping fee">
           {{ currentOrder.distanceKm }} km · <span class="order-reward mono">{{ formatVnd(currentOrder.reward) }}</span>
         </InfoRow>
-        <InfoRow v-if="currentOrder.note" label="Ghi chú">{{ currentOrder.note }}</InfoRow>
+        <InfoRow v-if="currentOrder.note" label="Note">{{ currentOrder.note }}</InfoRow>
       </HoloPanel>
     </div>
 
@@ -82,7 +82,7 @@ const handleDelivered = () => {
           <path d="M12 3 20 7.5v9L12 21 4 16.5v-9Z" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" />
           <path d="m8.5 12 2.5 2.5 4.5-5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" />
         </svg>
-        Nhận đơn
+        Accept order
       </GameButton>
 
       <GameButton v-else-if="status === 'delivering'" variant="success" block :tap-sound="false" @click="handleDelivered">
@@ -90,10 +90,10 @@ const handleDelivered = () => {
           <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2.2" />
           <path d="m7.8 12.3 2.9 2.9 5.5-6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" />
         </svg>
-        Xác nhận đã giao hàng
+        Confirm delivered
       </GameButton>
 
-      <GameButton v-else variant="ghost" block @click="back">Về danh sách đơn</GameButton>
+      <GameButton v-else variant="ghost" block @click="back">Back to orders</GameButton>
     </ActionBar>
   </div>
 </template>

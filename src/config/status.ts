@@ -1,9 +1,9 @@
 import type { OrderStatus } from "../store/game";
 
 export const STATUS_LABEL: Record<OrderStatus, string> = {
-  dispatching: "Đang điều phối",
-  delivering: "Đang giao hàng",
-  delivered: "Đã giao hàng",
+  dispatching: "Dispatching",
+  delivering: "Delivering",
+  delivered: "Delivered",
 };
 
 export const STATUS_TONE: Record<OrderStatus, "cyan" | "amber" | "green"> = {
@@ -12,9 +12,9 @@ export const STATUS_TONE: Record<OrderStatus, "cyan" | "amber" | "green"> = {
   delivered: "green",
 };
 
-/** The full status sentence, e.g. "Đang điều phối shipper An". */
+/** The full status sentence, e.g. "Dispatching shipper Alex". */
 export const statusSentence = (status: OrderStatus, shipper: string) => {
-  if (status === "dispatching") return `Đang điều phối shipper ${shipper}`;
-  if (status === "delivering") return `${shipper} đang giao hàng`;
-  return `${shipper} đã giao hàng thành công`;
+  if (status === "dispatching") return `Dispatching shipper ${shipper}`;
+  if (status === "delivering") return `${shipper} is delivering`;
+  return `${shipper} delivered successfully`;
 };
