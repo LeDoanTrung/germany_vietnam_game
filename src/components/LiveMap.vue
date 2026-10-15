@@ -5,20 +5,49 @@ import "leaflet/dist/leaflet.css";
 import { ROUTE, type LatLng } from "../config/route";
 import { useGeolocation } from "../composables/useGeolocation";
 import { useWakeLock } from "../composables/useWakeLock";
-import { formatDistance, remainingAlongPath, distanceMeters } from "../utils/geo";
+import { formatDistance, remainingAlongPath, distanceMeters, distanceToPath } from "../utils/geo";
 import { sounds } from "../composables/useSound";
 
 // Real map of the ride, with the player's live GPS position. GPS is "just for
 // fun" (client decision): it never blocks the game, and if location is denied
-// the route still shows.
+// the planned route still shows.
+//
+// The tour operator decides the actual route on the day, so the planned route
+// is only a faint suggestion: the line that matters is the trail of where the
+// rider has really been, drawn from GPS as they go (client: "if they take a
+// different route, the map changes too").
 //
 // Map data © OpenStreetMap contributors. Tiles come straight from OSM, which is
-// fine for a group this size; the route itself is precomputed (no API calls).
+// fine for a group this size; no routing API is called.
 
-const props = defineProps<{ gate: number }>();
+const props = defineProps<{ gate: number; orderId: string }>();
 
 /** Within this distance of the destination counts as "arrived". */
 const ARRIVED_RADIUS_M = 60;
+/** Further than this from the planned route counts as a different route. */
+const OFF_ROUTE_M = 80;
+/** Ignore fixes worse than this — indoors or between tall buildings GPS jumps around. */
+const MAX_ACCURACY_M = 50;
+/** Only extend the trail once the rider has moved this far, to skip standing-still jitter. */
+const MIN_STEP_M = 8;
+
+// The trail is kept per order, so a reload mid-ride doesn't wipe it.
+const trailKey = `shipper-game:trail:${props.orderId}`;
+const loadTrail = (): LatLng[] => {
+  try {
+    return JSON.parse(localStorage.getItem(trailKey) ?? "[]") as LatLng[];
+  } catch {
+    return [];
+  }
+};
+const trail: LatLng[] = loadTrail();
+const saveTrail = () => {
+  try {
+    localStorage.setItem(trailKey, JSON.stringify(trail));
+  } catch {
+    // Storage full or blocked — the trail just won't survive a reload.
+  }
+};
 
 const mapRef = ref<HTMLElement | null>(null);
 const { position, accuracy, status, start: startGps } = useGeolocation();
@@ -30,6 +59,9 @@ const following = ref(true);
 let map: L.Map | null = null;
 let riderMarker: L.Marker | null = null;
 let accuracyCircle: L.Circle | null = null;
+let trailGlow: L.Polyline | null = null;
+let trailLine: L.Polyline | null = null;
+let resizeObserver: ResizeObserver | null = null;
 
 const pin = (className: string, html: string) =>
   L.divIcon({ className: `live-map-pin ${className}`, html, iconSize: [36, 36], iconAnchor: [18, 18] });
@@ -44,9 +76,12 @@ onMounted(() => {
   }).addTo(map);
   L.control.zoom({ position: "bottomright" }).addTo(map);
 
-  // Route: a soft wide glow under a crisp line.
-  L.polyline(ROUTE.path, { color: "#ffb020", weight: 10, opacity: 0.22, lineCap: "round" }).addTo(map);
-  L.polyline(ROUTE.path, { color: "#ffb020", weight: 4, opacity: 0.95, lineCap: "round", dashArray: "1 9" }).addTo(map);
+  // Planned route: faint and dashed — the tour operator may choose another way.
+  L.polyline(ROUTE.path, { color: "#ffb020", weight: 4, opacity: 0.55, lineCap: "round", dashArray: "1 9" }).addTo(map);
+
+  // Where the rider has actually been: a bright glowing line, on top.
+  trailGlow = L.polyline(trail, { color: "#34bfff", weight: 12, opacity: 0.25, lineCap: "round", lineJoin: "round" }).addTo(map);
+  trailLine = L.polyline(trail, { color: "#34bfff", weight: 5, opacity: 1, lineCap: "round", lineJoin: "round" }).addTo(map);
 
   L.marker(ROUTE.start.coords, { icon: pin("live-map-pin-start", "A"), keyboard: false })
     .bindTooltip(`Start · Gate ${props.gate}`, { direction: "top", offset: [0, -16] })
@@ -58,15 +93,33 @@ onMounted(() => {
   map.fitBounds(L.latLngBounds(ROUTE.path), { padding: [28, 28] });
   // A drag means the player wants to look around: stop auto-centring.
   map.on("dragstart", () => (following.value = false));
+
+  // Leaflet measures its box once. The box changes after that (screen slide-in,
+  // the phone's address bar showing and hiding), which leaves unloaded grey
+  // tiles — so re-measure whenever it resizes.
+  resizeObserver = new ResizeObserver(() => map?.invalidateSize());
+  resizeObserver.observe(mapRef.value);
 });
 
 onBeforeUnmount(() => {
+  resizeObserver?.disconnect();
   map?.remove();
   map = null;
 });
 
+const extendTrail = (next: LatLng) => {
+  if ((accuracy.value ?? Infinity) > MAX_ACCURACY_M) return;
+  const last = trail[trail.length - 1];
+  if (last && distanceMeters(last, next) < MIN_STEP_M) return;
+  trail.push(next);
+  trailGlow?.addLatLng(next);
+  trailLine?.addLatLng(next);
+  saveTrail();
+};
+
 watch(position, (next) => {
   if (!map || !next) return;
+  extendTrail(next);
   if (!riderMarker) {
     riderMarker = L.marker(next, { icon: pin("live-map-pin-rider", "🛵"), zIndexOffset: 1000, keyboard: false }).addTo(map);
     accuracyCircle = L.circle(next, { radius: accuracy.value ?? 0, color: "#34bfff", weight: 1, fillOpacity: 0.12 }).addTo(map);
@@ -79,7 +132,17 @@ watch(position, (next) => {
   if (following.value) map.setView(next, 16, { animate: true });
 });
 
-const remaining = computed(() => (position.value ? remainingAlongPath(ROUTE.path, position.value) : null));
+/** The rider has left the planned route, e.g. the tour took another street. */
+const offRoute = computed(() => !!position.value && distanceToPath(ROUTE.path, position.value) > OFF_ROUTE_M);
+
+// On the planned route: distance along it. Off it: straight-line distance,
+// since we don't know which streets the tour will take.
+const remaining = computed(() => {
+  if (!position.value) return null;
+  return offRoute.value
+    ? distanceMeters(position.value, ROUTE.destination.coords as LatLng)
+    : remainingAlongPath(ROUTE.path, position.value);
+});
 const arrived = computed(
   () => !!position.value && distanceMeters(position.value, ROUTE.destination.coords as LatLng) <= ARRIVED_RADIUS_M,
 );
@@ -129,8 +192,10 @@ const recenter = () => {
         <span class="live-map-info-sub">Confirm the delivery below.</span>
       </template>
       <template v-else-if="status === 'tracking' && remaining !== null">
-        <span class="live-map-info-main">{{ formatDistance(remaining) }} to go</span>
-        <span class="live-map-info-sub">to {{ ROUTE.destination.name }}</span>
+        <span class="live-map-info-main">{{ offRoute ? "~" : "" }}{{ formatDistance(remaining) }} to go</span>
+        <span class="live-map-info-sub">
+          {{ offRoute ? "Taking another way — the map follows you." : `to ${ROUTE.destination.name}` }}
+        </span>
       </template>
       <template v-else-if="status === 'requesting'">
         <span class="live-map-info-main">Finding you…</span>
@@ -149,6 +214,11 @@ const recenter = () => {
         <span class="live-map-info-sub">to {{ ROUTE.destination.name }}</span>
       </template>
     </figcaption>
+
+    <p class="live-map-legend" aria-hidden="true">
+      <span><i class="live-map-legend-trail"></i>Your ride</span>
+      <span><i class="live-map-legend-plan"></i>Suggested route</span>
+    </p>
 
     <p class="live-map-safety">🛵 Ride safely — don't use your phone while driving.</p>
   </figure>
@@ -314,6 +384,36 @@ const recenter = () => {
     &-sub {
       font-size: 13px;
       color: var(--color-text-300);
+    }
+  }
+
+  &-legend {
+    display: flex;
+    gap: var(--space-md);
+    padding: 0 var(--space-md) var(--space-sm);
+    font-size: 12px;
+    color: var(--color-text-300);
+
+    span {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    i {
+      display: inline-block;
+      width: 22px;
+      height: 4px;
+      border-radius: 2px;
+    }
+
+    &-trail {
+      background: var(--color-cyan-400);
+      box-shadow: 0 0 6px var(--color-cyan-400);
+    }
+
+    &-plan {
+      background: repeating-linear-gradient(90deg, var(--color-amber-400) 0 3px, transparent 3px 7px);
     }
   }
 

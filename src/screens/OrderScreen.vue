@@ -89,7 +89,7 @@ const setMapView = (view: "live" | "animated") => {
         <button type="button" :aria-pressed="mapView === 'animated'" @click="setMapView('animated')">✨ Animation</button>
       </div>
 
-      <LiveMap v-if="showLiveMap" :gate="currentOrder.gate" />
+      <LiveMap v-if="showLiveMap" :gate="currentOrder.gate" :order-id="currentOrder.id" />
       <RouteMap v-else :order="currentOrder" :mode="MAP_MODE[status]" />
 
       <HoloPanel :delay="0.2">

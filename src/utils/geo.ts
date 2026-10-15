@@ -34,5 +34,9 @@ export const remainingAlongPath = (path: LatLng[], position: LatLng) => {
   return remaining;
 };
 
+/** Distance from `position` to the closest point of `path`, in metres. */
+export const distanceToPath = (path: LatLng[], position: LatLng) =>
+  path.reduce((closest, point) => Math.min(closest, distanceMeters(point, position)), Infinity);
+
 export const formatDistance = (meters: number) =>
   meters < 1000 ? `${Math.round(meters / 10) * 10} m` : `${(meters / 1000).toFixed(1)} km`;
