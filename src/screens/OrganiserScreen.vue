@@ -331,7 +331,7 @@ const gameUrl = computed(() => location.href.replace(/#.*$/, ""));
           </small>
         </label>
         <label>
-          Event code <em>(optional)</em>
+          <span>Event code <em>(optional)</em></span>
           <input v-model="joinCode" type="text" maxlength="16" autocomplete="off" placeholder="Leave empty = off" />
           <small>When set, players must type it before START. Only switch it on once everyone has been told the code.</small>
         </label>
@@ -342,7 +342,7 @@ const gameUrl = computed(() => location.href.replace(/#.*$/, ""));
         <h2>Reset the round</h2>
         <p>Frees every order — use it to clear test data before the event. Codes are kept. This can't be undone.</p>
         <label>
-          Type <b>RESET</b> to confirm
+          <span>Type <b>RESET</b> to confirm</span>
           <input v-model="resetConfirm" type="text" autocomplete="off" />
         </label>
         <button type="submit" class="org-button org-button-danger" :disabled="busy || resetConfirm.trim().toUpperCase() !== 'RESET'">
