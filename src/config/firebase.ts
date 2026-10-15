@@ -7,10 +7,10 @@
 // but each phone only knows about its own order.
 
 export const FIREBASE_CONFIG = {
-  apiKey: "",
-  authDomain: "",
-  projectId: "",
-  appId: "",
+  apiKey: "AIzaSyB8b7M30vQgBSRbz7FFyN5jfL-kz9YQCgc",
+  authDomain: "phd-workshop-shipper-gam-61da5.firebaseapp.com",
+  projectId: "phd-workshop-shipper-gam-61da5",
+  appId: "1:1015545115194:web:7f06bae0ee7f77294dfb03",
 };
 
 /**
