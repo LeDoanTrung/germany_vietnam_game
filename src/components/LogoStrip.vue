@@ -36,18 +36,20 @@ const crayonId = `logo-crayon-${useId()}`;
 
       <!-- Learn Logistics by Kühne Foundation -->
       <div class="logos-sticker logos-sticker-learn">
-        <!-- One continuous red line, as in the real mark: down the left side,
-             along the bottom, back up-left to a point, then up-right into an arrow. -->
-        <svg class="logos-learn-mark" viewBox="0 0 44 52">
+        <!-- Whole logo in one SVG, coordinates measured off the real logo so the
+             proportions match: mark top level with the cap height of LEARN, mark
+             bottom on the LOGISTICS baseline. textLength pins each line to its
+             measured width, so a missing font can't change the proportions. -->
+        <svg class="logos-learn-logo" viewBox="66 22 640 242">
           <g :filter="`url(#${crayonId})`">
-            <path d="M7 5V46H29L13 27L35 9" class="logos-learn-line" />
-            <path d="M40 4L29.5 6.5L37.5 14.5Z" class="logos-learn-arrow" />
+            <!-- One continuous red line: down, along the bottom, back up-left, up-right into the arrow -->
+            <path d="M79 34V158H192L123 92L164 49" class="logos-learn-line" />
+            <path d="M181 32L172 57L156 42Z" class="logos-learn-arrow" />
           </g>
+          <text x="245" y="92" textLength="250" lengthAdjust="spacingAndGlyphs" class="logos-learn-word">LEARN</text>
+          <text x="245" y="160" textLength="425" lengthAdjust="spacingAndGlyphs" class="logos-learn-word">LOGISTICS</text>
+          <text x="248" y="252" textLength="442" lengthAdjust="spacingAndGlyphs" class="logos-learn-by">by Kühne Foundation</text>
         </svg>
-        <span class="logos-learn">
-          <span class="logos-learn-title">LEARN<br />LOGISTICS</span>
-          <span class="logos-learn-by">by Kühne Foundation</span>
-        </span>
       </div>
     </div>
 
@@ -139,22 +141,18 @@ const crayonId = `logo-crayon-${useId()}`;
     color: #333;
   }
 
+  // Sizes are in the logo's own measured units (see the viewBox).
   &-learn {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    text-align: left;
-
-    &-mark {
-      flex-shrink: 0;
-      width: 30px;
-      height: 38px;
+    &-logo {
+      display: block;
+      height: 44px;
+      width: auto;
     }
 
     &-line {
       fill: none;
       stroke: var(--learn-red);
-      stroke-width: 3.2;
+      stroke-width: 7;
       stroke-linecap: square;
       stroke-linejoin: miter;
     }
@@ -164,21 +162,18 @@ const crayonId = `logo-crayon-${useId()}`;
     }
 
     // The real wordmark is a classic serif in navy, regular weight.
-    &-title {
-      font-family: "Times New Roman", Georgia, "Noto Serif", serif;
+    &-word {
+      fill: var(--learn-navy);
+      font-family: "Times New Roman", Times, Georgia, "Noto Serif", serif;
       font-weight: 400;
-      font-size: 15px;
-      line-height: 1;
-      letter-spacing: 0.04em;
-      color: var(--learn-navy);
+      font-size: 82px;
     }
 
     &-by {
-      margin-top: 3px;
+      fill: #3d3d3d;
       font-family: var(--font-display);
       font-weight: 400;
-      font-size: 9.5px;
-      color: #444;
+      font-size: 42px;
     }
   }
 
