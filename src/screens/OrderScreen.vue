@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, defineAsyncComponent, onBeforeUnmount, ref, watch } from "vue";
+import { computed, defineAsyncComponent, h, onBeforeUnmount, ref, watch } from "vue";
 import AppHeader from "../components/AppHeader.vue";
 import HoloPanel from "../components/HoloPanel.vue";
 import ScrambleText from "../components/ScrambleText.vue";
@@ -22,7 +22,20 @@ import { useWakeLock } from "../composables/useWakeLock";
 import { distanceMeters, formatDistance, isWithinDelivery } from "../utils/geo";
 
 // The real map pulls in Leaflet, so it only loads once someone is actually riding.
-const LiveMap = defineAsyncComponent(() => import("../components/LiveMap.vue"));
+// A failed load (flaky network, or a page left open across a deploy) used to
+// leave a blank gap: retry twice, then offer a reload instead.
+const LiveMap = defineAsyncComponent({
+  loader: () => import("../components/LiveMap.vue"),
+  onError: (_error, retry, fail, attempts) => {
+    if (attempts <= 2) window.setTimeout(retry, 1000 * attempts);
+    else fail();
+  },
+  errorComponent: () =>
+    h("div", { class: "order-map-error" }, [
+      h("p", "The live map couldn't load."),
+      h("button", { type: "button", onClick: () => window.location.reload() }, "↻ Reload"),
+    ]),
+});
 
 // One frame for the whole order, as the client described it: "Accept order"
 // takes it (nobody else can afterwards) and shows where to wait; then the ride,
@@ -554,6 +567,35 @@ const setMapView = (view: "live" | "animated") => {
         background: var(--color-cyan-400);
         color: #001a2e;
       }
+    }
+  }
+
+  // Shown in place of the live map if it can't be loaded.
+  &-map-error {
+    display: grid;
+    justify-items: center;
+    gap: 10px;
+    padding: 28px 16px;
+    border: 1px solid rgba(52, 191, 255, 0.35);
+    border-radius: var(--radius-md);
+    background: rgba(2, 10, 28, 0.6);
+    color: var(--color-text-300);
+    text-align: center;
+
+    :deep(p) {
+      margin: 0;
+    }
+
+    :deep(button) {
+      min-height: 40px;
+      padding: 0 20px;
+      border: none;
+      border-radius: var(--radius-pill);
+      background: var(--color-cyan-400);
+      color: #001a2e;
+      font-weight: 700;
+      font-size: 14px;
+      cursor: pointer;
     }
   }
 

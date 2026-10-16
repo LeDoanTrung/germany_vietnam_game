@@ -13,4 +13,19 @@ import "@fontsource/space-mono/700.css";
 import "./styles/main.scss";
 import App from "./App.vue";
 
+// After a deploy, a page opened earlier asks for code files under their old
+// names, which are gone, so e.g. the live map silently never appears. Reload
+// once to pick up the new version (at most once a minute, to avoid a loop).
+window.addEventListener("vite:preloadError", (event) => {
+  try {
+    const last = Number(sessionStorage.getItem("shipper-game:reloaded-at") ?? 0);
+    if (Date.now() - last < 60_000) return;
+    sessionStorage.setItem("shipper-game:reloaded-at", String(Date.now()));
+  } catch {
+    return;
+  }
+  event.preventDefault();
+  window.location.reload();
+});
+
 createApp(App).mount("#app");

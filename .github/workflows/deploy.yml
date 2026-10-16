@@ -41,4 +41,6 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./dist
           publish_branch: gh-pages
-          force_orphan: true
+          # Keep the previous build's files: a phone still showing the old page
+          # loads its map chunk by the old name, which would 404 if deleted.
+          keep_files: true
