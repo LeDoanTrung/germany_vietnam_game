@@ -240,3 +240,51 @@ test("a player can see whether they are an organiser, but not who else is", asyn
   await assertSucceeds(getDoc(doc(phone("boss"), "admins", "boss")));
   await assertFails(getDoc(doc(phone("alex"), "admins", "boss")));
 });
+
+// ---- Renaming ----------------------------------------------------------------
+
+// The same batch the app sends from "Edit name".
+const rename = (db, uid, orderId, name) => {
+  const batch = writeBatch(db);
+  batch.update(orderRef(db, orderId), { shipper: name });
+  batch.update(playerRef(db, uid), { name });
+  return batch.commit();
+};
+
+test("a player can fix their name on the order they took", async () => {
+  const db = phone("alex");
+  await claim(db, "alex", "o1", "Alx");
+  await assertSucceeds(rename(db, "alex", "o1", "Alex"));
+  const saved = (await getDoc(orderRef(db, "o1"))).data();
+  assert.equal(saved.shipper, "Alex");
+  assert.equal(saved.status, "delivering");
+});
+
+test("a player can still fix their name after delivering", async () => {
+  const db = phone("alex");
+  await claim(db, "alex", "o1", "Alx");
+  await updateDoc(orderRef(db, "o1"), { status: "delivered", deliveredAt: serverTimestamp() });
+  await assertSucceeds(rename(db, "alex", "o1", "Alex"));
+});
+
+test("nobody can rename someone else's order", async () => {
+  await claim(phone("alex"), "alex", "o1", "Alex");
+  await assertFails(updateDoc(orderRef(phone("ben"), "o1"), { shipper: "Ben" }));
+  await assertFails(updateDoc(playerRef(phone("ben"), "alex"), { name: "Ben" }));
+});
+
+test("renaming can't sneak in other changes", async () => {
+  const db = phone("alex");
+  await claim(db, "alex", "o1", "Alex");
+  await assertFails(updateDoc(orderRef(db, "o1"), { shipper: "Alexa", uid: "ben" }));
+  // A new name and a status change in one write: neither rule allows both.
+  await assertFails(updateDoc(orderRef(db, "o1"), { shipper: "Alexa", status: "delivered" }));
+  await assertFails(updateDoc(playerRef(db, "alex"), { name: "Alexa", orderId: "o9" }));
+});
+
+test("names must stay between 1 and 24 characters when renaming", async () => {
+  const db = phone("alex");
+  await claim(db, "alex", "o1", "Alex");
+  await assertFails(rename(db, "alex", "o1", ""));
+  await assertFails(rename(db, "alex", "o1", "A".repeat(25)));
+});

@@ -40,6 +40,8 @@ export interface ClaimsBackend {
   deliver(orderId: string): Promise<void>;
   /** Gives the order back (allowed for 10 minutes after taking it). */
   release(orderId: string): Promise<void>;
+  /** Fixes a typo in the name shown on the player's order. */
+  rename(orderId: string, name: string): Promise<void>;
   /** Local mode only — online rounds are reset by the organiser. */
   reset?(): void;
 }
@@ -118,6 +120,10 @@ const createLocalBackend = (): ClaimsBackend => {
       const next = { ...claims };
       delete next[orderId];
       save(next);
+    },
+    async rename(orderId, name) {
+      const claim = claims[orderId];
+      if (claim) save({ ...claims, [orderId]: { ...claim, shipper: name } });
     },
     reset() {
       save({});
@@ -218,6 +224,12 @@ const createFirebaseBackend = async (): Promise<ClaimsBackend> => {
       const batch = writeBatch(db);
       batch.delete(orderRef(orderId));
       batch.delete(playerRef);
+      await withTimeout(batch.commit(), 12000);
+    },
+    async rename(orderId, name) {
+      const batch = writeBatch(db);
+      batch.update(orderRef(orderId), { shipper: name });
+      batch.update(playerRef, { name });
       await withTimeout(batch.commit(), 12000);
     },
   };

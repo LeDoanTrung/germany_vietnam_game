@@ -38,11 +38,17 @@ service cloud.firestore {
         && getAfter(playerPath(request.auth.uid)).data.orderId == orderId;
 
       // The shipper confirms their own delivery; an organiser can do it for them.
+      // Or the shipper fixes a typo in their name — and nothing else.
       allow update: if request.auth != null
-        && resource.data.status == 'delivering'
-        && request.resource.data.status == 'delivered'
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'deliveredAt'])
-        && (resource.data.uid == request.auth.uid || isAdmin());
+        && ((resource.data.status == 'delivering'
+            && request.resource.data.status == 'delivered'
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'deliveredAt'])
+            && (resource.data.uid == request.auth.uid || isAdmin()))
+          || (resource.data.uid == request.auth.uid
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['shipper'])
+            && request.resource.data.shipper is string
+            && request.resource.data.shipper.size() > 0
+            && request.resource.data.shipper.size() <= 24));
 
       // "Picked the wrong order": the shipper can give it back for 10 minutes,
       // together with their player record (so they can take another).
@@ -66,7 +72,13 @@ service cloud.firestore {
         || (request.auth != null
           && request.auth.uid == uid
           && !existsAfter(/databases/$(database)/documents/rounds/$(round)/orders/$(resource.data.orderId)));
-      allow update: if false;
+      // Fixing a typo in the player's own name.
+      allow update: if request.auth != null
+        && request.auth.uid == uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name'])
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0
+        && request.resource.data.name.size() <= 24;
     }
 
     // Unlock code and join code, set by organisers from the organiser page.

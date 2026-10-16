@@ -26,7 +26,7 @@ const {
   earnings,
   go,
   start,
-  changeName,
+  renamePlayer,
   nameInUse,
   joinCodeRequired,
   joinCodeMatches,
@@ -62,11 +62,40 @@ const handleStart = () => {
   start(name);
 };
 
-const handleChangeName = () => {
+// ---- Edit name (typo fix), before or after taking an order ----
+
+const editingName = ref(false);
+const editNameInput = ref("");
+const savingName = ref(false);
+/** Name already used by someone else: ask once before saving it. */
+const editDuplicateWarned = ref("");
+
+const openNameEditor = () => {
   sounds.tap();
-  nameInput.value = state.playerName;
-  duplicateWarned.value = "";
-  changeName();
+  editNameInput.value = state.playerName;
+  editDuplicateWarned.value = "";
+  editingName.value = true;
+};
+
+const saveName = async () => {
+  const name = editNameInput.value.trim();
+  if (!name || savingName.value) return;
+  if (name === state.playerName) {
+    editingName.value = false;
+    return;
+  }
+  if (nameInUse(name) && editDuplicateWarned.value !== name) {
+    sounds.tap();
+    editDuplicateWarned.value = name;
+    return;
+  }
+  savingName.value = true;
+  const saved = await renamePlayer(name);
+  savingName.value = false;
+  if (saved) {
+    sounds.confirm();
+    editingName.value = false;
+  }
 };
 
 const allDelivered = computed(() => deliveredOrders.value.length === ORDERS.length);
@@ -182,14 +211,41 @@ const openMyOrder = () => {
           </template>
 
           <template v-else>
-            <p class="home-greeting">Hi, {{ state.playerName }}! 👋</p>
-            <template v-if="myOrder">
-              <p class="home-frame-hint">You're delivering Order {{ myOrder.number }}.</p>
-              <GameButton variant="crayon" block @click="openMyOrder">Open my order</GameButton>
-            </template>
+            <form v-if="editingName" class="home-rename" @submit.prevent="saveName">
+              <label class="home-name">
+                <span class="home-name-label">Your name</span>
+                <input
+                  v-model="editNameInput"
+                  class="home-name-input"
+                  type="text"
+                  maxlength="24"
+                  autocomplete="given-name"
+                  enterkeyhint="done"
+                  required
+                />
+              </label>
+              <p v-if="editDuplicateWarned && editDuplicateWarned === editNameInput.trim()" class="home-warning" role="alert">
+                Someone called <b>{{ editNameInput.trim() }}</b> already took an order. Add your last initial — or tap
+                Save again to keep it.
+              </p>
+              <div class="home-rename-actions">
+                <GameButton variant="crayon" type="submit" :disabled="savingName || !editNameInput.trim()">
+                  {{ savingName ? "Saving…" : "Save" }}
+                </GameButton>
+                <button type="button" class="home-reset" @click="editingName = false">Cancel</button>
+              </div>
+            </form>
+
             <template v-else>
-              <p class="home-frame-hint home-frame-hint-strong">↑ Tap the notification above</p>
-              <button type="button" class="home-reset" @click="handleChangeName">Not {{ state.playerName }}? Change name</button>
+              <p class="home-greeting">Hi, {{ state.playerName }}! 👋</p>
+              <template v-if="myOrder">
+                <p class="home-frame-hint">You're delivering Order {{ myOrder.number }}.</p>
+                <GameButton variant="crayon" block @click="openMyOrder">Open my order</GameButton>
+              </template>
+              <p v-else class="home-frame-hint home-frame-hint-strong">↑ Tap the notification above</p>
+              <button type="button" class="home-reset" @click="openNameEditor">
+                Not {{ state.playerName }}? Edit name
+              </button>
             </template>
           </template>
 
@@ -455,6 +511,20 @@ const openMyOrder = () => {
     font-size: 13px;
     line-height: 1.35;
     color: #3b2a00;
+  }
+
+  &-rename {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-sm);
+    width: 100%;
+
+    &-actions {
+      display: flex;
+      align-items: center;
+      gap: var(--space-md);
+    }
   }
 
   &-greeting {

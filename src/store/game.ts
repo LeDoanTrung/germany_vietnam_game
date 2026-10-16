@@ -133,10 +133,38 @@ export const useGame = () => {
     state.started = true;
   };
 
-  /** "Not you? Change name" — only before taking an order (the name is on the order after). */
-  const changeName = () => {
-    if (myOrder.value) return;
-    state.started = false;
+  /**
+   * "Edit name" — fixes a typo, before or after taking an order. Once an order
+   * is taken the new name is written to it too, so every phone and the
+   * organiser page see it. Resolves to false if that couldn't be saved.
+   */
+  const renamePlayer = async (name: string) => {
+    const next = name.trim().slice(0, 24);
+    if (!next) return false;
+
+    const order = myOrder.value;
+    if (order && backend) {
+      try {
+        await backend.rename(order.id, next);
+      } catch (error) {
+        const code = (error as { code?: string }).code;
+        showNotice(
+          code === "permission-denied"
+            ? "Couldn't change the name on your order — ask the organiser."
+            : "No connection — check your internet and try again.",
+        );
+        return false;
+      }
+    }
+
+    state.playerName = next;
+    try {
+      localStorage.setItem(NAME_KEY, next);
+    } catch {
+      // Not persisted; harmless.
+    }
+    showNotice(`Name changed to ${next}.`);
+    return true;
   };
 
   const openOrder = (id: string) => go("order", id);
@@ -241,7 +269,7 @@ export const useGame = () => {
     go,
     back,
     start,
-    changeName,
+    renamePlayer,
     nameInUse,
     joinCodeRequired,
     joinCodeMatches,
