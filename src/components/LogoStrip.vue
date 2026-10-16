@@ -25,7 +25,7 @@ const crayonId = `logo-crayon-${useId()}`;
       <div class="logos-sticker logos-sticker-klu">
         <svg class="logos-klu-mark" viewBox="0 0 64 52">
           <rect x="3" y="3" width="58" height="46" rx="7" class="logos-klu-box" :filter="`url(#${crayonId})`" />
-          <text x="32" y="36" class="logos-klu-text">KLU</text>
+          <text x="32" y="34" class="logos-klu-text">KLU</text>
         </svg>
         <span class="logos-wordmark">
           <span>Kühne</span>
@@ -36,16 +36,16 @@ const crayonId = `logo-crayon-${useId()}`;
 
       <!-- Learn Logistics by Kühne Foundation -->
       <div class="logos-sticker logos-sticker-learn">
+        <!-- One continuous red line, as in the real mark: down the left side,
+             along the bottom, back up-left to a point, then up-right into an arrow. -->
         <svg class="logos-learn-mark" viewBox="0 0 44 52">
-          <g :filter="`url(#${crayonId})`" class="logos-learn-strokes">
-            <path d="M8 6v40" />
-            <path d="M8 30l20 16" />
-            <path d="M8 30l26-22" />
-            <path d="M24 7h11v11" />
+          <g :filter="`url(#${crayonId})`">
+            <path d="M7 5V46H29L13 27L35 9" class="logos-learn-line" />
+            <path d="M40 4L29.5 6.5L37.5 14.5Z" class="logos-learn-arrow" />
           </g>
         </svg>
         <span class="logos-learn">
-          <span class="logos-learn-title">Learn<br />Logistics</span>
+          <span class="logos-learn-title">LEARN<br />LOGISTICS</span>
           <span class="logos-learn-by">by Kühne Foundation</span>
         </span>
       </div>
@@ -60,6 +60,7 @@ const crayonId = `logo-crayon-${useId()}`;
 .logos {
   --klu-red: #e8380d;
   --learn-navy: #22345e;
+  --learn-red: #c8102e;
 
   display: flex;
   flex-direction: column;
@@ -114,34 +115,35 @@ const crayonId = `logo-crayon-${useId()}`;
       stroke-width: 2.5;
     }
 
+    // "KLU" is a white bold serif on the red square, as in the real logo.
     &-text {
       fill: #fff;
-      font-family: var(--font-poster);
-      font-weight: 800;
-      font-size: 24px;
+      font-family: "Times New Roman", Georgia, "Noto Serif", serif;
+      font-weight: 700;
+      font-size: 22px;
+      letter-spacing: 0.02em;
       text-anchor: middle;
-      paint-order: stroke;
-      stroke: var(--color-poster-ink);
-      stroke-width: 3px;
-      stroke-linejoin: round;
     }
   }
 
+  // "KÜHNE / LOGISTICS / UNIVERSITY": plain sans, regular weight.
   &-wordmark {
     display: flex;
     flex-direction: column;
-    font-family: var(--font-hand);
-    font-weight: 700;
-    font-size: 10.5px;
-    line-height: 1.12;
+    font-family: var(--font-display);
+    font-weight: 400;
+    font-size: 10px;
+    line-height: 1.15;
     text-transform: uppercase;
     letter-spacing: 0.02em;
-    color: #3b3b3b;
+    color: #333;
   }
 
   &-learn {
     display: flex;
     flex-direction: column;
+    align-items: flex-start;
+    text-align: left;
 
     &-mark {
       flex-shrink: 0;
@@ -149,30 +151,34 @@ const crayonId = `logo-crayon-${useId()}`;
       height: 38px;
     }
 
-    &-strokes path {
+    &-line {
       fill: none;
-      stroke: var(--klu-red);
-      stroke-width: 5;
-      stroke-linecap: round;
-      stroke-linejoin: round;
+      stroke: var(--learn-red);
+      stroke-width: 3.2;
+      stroke-linecap: square;
+      stroke-linejoin: miter;
     }
 
+    &-arrow {
+      fill: var(--learn-red);
+    }
+
+    // The real wordmark is a classic serif in navy, regular weight.
     &-title {
-      font-family: var(--font-poster);
-      font-weight: 800;
+      font-family: "Times New Roman", Georgia, "Noto Serif", serif;
+      font-weight: 400;
       font-size: 15px;
-      line-height: 0.95;
-      text-transform: uppercase;
-      letter-spacing: 0.02em;
+      line-height: 1;
+      letter-spacing: 0.04em;
       color: var(--learn-navy);
     }
 
     &-by {
       margin-top: 3px;
-      font-family: var(--font-hand);
-      font-weight: 600;
+      font-family: var(--font-display);
+      font-weight: 400;
       font-size: 9.5px;
-      color: #555;
+      color: #444;
     }
   }
 

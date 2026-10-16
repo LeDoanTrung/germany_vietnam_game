@@ -63,7 +63,15 @@ const handleAccept = () => {
 // "Confirm delivered" only unlocks near the destination. If GPS can't help
 // (location off, no signal, bad indoor fix) the organiser can unlock it with a code.
 
-const { position, accuracy, status: gpsStatus, start: startGps, resumeIfAllowed } = useGeolocation();
+const { position, accuracy, status: gpsStatus, start: startGps, retry: retryGps, resumeIfAllowed } = useGeolocation();
+
+/** iPhone with "Precise Location" off reports a fix kilometres wide — it can never unlock. */
+const approximateOnly = computed(() => gpsStatus.value === "tracking" && (accuracy.value ?? 0) > 500);
+
+const handleRetryLocation = () => {
+  sounds.tap();
+  retryGps();
+};
 const { request: keepScreenOn } = useWakeLock();
 
 const isRiding = computed(() => isMine.value && status.value === "delivering");
@@ -309,7 +317,11 @@ const setMapView = (view: "live" | "animated") => {
       <!-- My order, on the way: locked until the rider reaches the destination -->
       <template v-else-if="isRiding">
         <div v-if="!canConfirm" class="order-gate-status" aria-live="polite">
-          <template v-if="gpsStatus === 'tracking' && distanceLeft !== null">
+          <template v-if="approximateOnly">
+            📍 Your phone only shares an <b>approximate</b> location. Switch <b>Precise Location</b> on for this
+            browser in your phone's Settings, then tap Try again.
+          </template>
+          <template v-else-if="gpsStatus === 'tracking' && distanceLeft !== null">
             🔒 Get within {{ DELIVERY.radiusMeters }} m of {{ currentOrder.to.name }} to confirm —
             <b>{{ formatDistance(distanceLeft) }} away</b>
           </template>
@@ -321,11 +333,19 @@ const setMapView = (view: "live" | "animated") => {
             📍 No GPS signal. Move into the open, or ask the organiser for the unlock code.
           </template>
           <template v-else>🔒 "Confirm delivered" unlocks when you reach {{ currentOrder.to.name }}.</template>
-          <LocationHelp v-if="gpsStatus === 'denied' || gpsStatus === 'unavailable'" class="order-location-help" />
+          <LocationHelp v-if="gpsStatus === 'denied' || gpsStatus === 'unavailable' || approximateOnly" class="order-location-help" />
         </div>
 
         <GameButton v-if="gpsStatus === 'idle' && !canConfirm" block @click="handleTurnOnLocation">
           📍 Turn on location
+        </GameButton>
+        <GameButton
+          v-else-if="!canConfirm && (gpsStatus === 'denied' || gpsStatus === 'unavailable' || approximateOnly)"
+          block
+          :tap-sound="false"
+          @click="handleRetryLocation"
+        >
+          📍 Try again
         </GameButton>
 
         <GameButton

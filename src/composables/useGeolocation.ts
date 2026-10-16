@@ -32,7 +32,12 @@ const start = () => {
       status.value = "tracking";
     },
     (error) => {
-      if (error.code === error.PERMISSION_DENIED) status.value = "denied";
+      if (error.code === error.PERMISSION_DENIED) {
+        status.value = "denied";
+        // Drop the dead watch so "Try again" can start a fresh one once the
+        // player has fixed the setting (otherwise only a reload would).
+        clearWatch();
+      }
       // A timeout mid-ride (tunnel, tall buildings) keeps the last known spot.
       else if (!position.value) status.value = "unavailable";
     },
@@ -40,9 +45,19 @@ const start = () => {
   );
 };
 
-const stop = () => {
+const clearWatch = () => {
   if (watchId !== null) navigator.geolocation.clearWatch(watchId);
   watchId = null;
+};
+
+/** "Try again" after the player turned location on in Settings. */
+const retry = () => {
+  clearWatch();
+  start();
+};
+
+const stop = () => {
+  clearWatch();
   // Forget the last fix: an old position must not count as "near the destination".
   position.value = null;
   accuracy.value = null;
@@ -74,5 +89,5 @@ export const useGeolocation = () => {
     if (consumers === 0) stop();
   });
 
-  return { position, accuracy, status, start, resumeIfAllowed };
+  return { position, accuracy, status, start, retry, resumeIfAllowed };
 };
