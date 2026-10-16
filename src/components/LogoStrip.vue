@@ -23,15 +23,16 @@ const crayonId = `logo-crayon-${useId()}`;
     <div class="logos-row" aria-hidden="true">
       <!-- Kühne Logistics University -->
       <div class="logos-sticker logos-sticker-klu">
-        <svg class="logos-klu-mark" viewBox="0 0 64 52">
-          <rect x="3" y="3" width="58" height="46" rx="7" class="logos-klu-box" :filter="`url(#${crayonId})`" />
-          <text x="32" y="34" class="logos-klu-text">KLU</text>
+        <!-- Whole logo in one SVG, measured off the real logo: KLU sits at the
+             bottom of the red square, the three wordmark lines are left-aligned
+             and UNIVERSITY shares KLU's baseline. textLength keeps proportions. -->
+        <svg class="logos-klu-logo" viewBox="28 18 330 116">
+          <rect x="35" y="22" width="123" height="106" rx="10" class="logos-klu-box" :filter="`url(#${crayonId})`" />
+          <text x="50" y="113" textLength="93" lengthAdjust="spacingAndGlyphs" class="logos-klu-text">KLU</text>
+          <text x="187" y="58" textLength="72" lengthAdjust="spacingAndGlyphs" class="logos-klu-word">KÜHNE</text>
+          <text x="187" y="86" textLength="141" lengthAdjust="spacingAndGlyphs" class="logos-klu-word">LOGISTICS</text>
+          <text x="187" y="113" textLength="163" lengthAdjust="spacingAndGlyphs" class="logos-klu-word">UNIVERSITY</text>
         </svg>
-        <span class="logos-wordmark">
-          <span>Kühne</span>
-          <span>Logistics</span>
-          <span>University</span>
-        </span>
       </div>
 
       <!-- Learn Logistics by Kühne Foundation -->
@@ -104,41 +105,33 @@ const crayonId = `logo-crayon-${useId()}`;
     }
   }
 
+  // Sizes are in the logo's own measured units (see the viewBox).
   &-klu {
-    &-mark {
-      flex-shrink: 0;
-      width: 46px;
-      height: 38px;
+    &-logo {
+      display: block;
+      height: 44px;
+      width: auto;
     }
 
     &-box {
       fill: var(--klu-red);
-      stroke: var(--color-poster-ink);
-      stroke-width: 2.5;
     }
 
-    // "KLU" is a white bold serif on the red square, as in the real logo.
+    // "KLU" is a white bold serif at the bottom of the red square.
     &-text {
       fill: #fff;
-      font-family: "Times New Roman", Georgia, "Noto Serif", serif;
+      font-family: "Times New Roman", Times, Georgia, "Noto Serif", serif;
       font-weight: 700;
-      font-size: 22px;
-      letter-spacing: 0.02em;
-      text-anchor: middle;
+      font-size: 43px;
     }
-  }
 
-  // "KÜHNE / LOGISTICS / UNIVERSITY": plain sans, regular weight.
-  &-wordmark {
-    display: flex;
-    flex-direction: column;
-    font-family: var(--font-display);
-    font-weight: 400;
-    font-size: 10px;
-    line-height: 1.15;
-    text-transform: uppercase;
-    letter-spacing: 0.02em;
-    color: #333;
+    // "KÜHNE / LOGISTICS / UNIVERSITY": plain sans, regular weight, left-aligned.
+    &-word {
+      fill: #3a3a3a;
+      font-family: Arial, "Helvetica Neue", Helvetica, var(--font-display), sans-serif;
+      font-weight: 400;
+      font-size: 26px;
+    }
   }
 
   // Sizes are in the logo's own measured units (see the viewBox).
