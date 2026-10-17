@@ -190,40 +190,40 @@ const recenter = () => {
     </button>
 
     <figcaption class="live-map-info">
-      <template v-if="arrived">
-        <span class="live-map-info-main live-map-info-arrived">You've arrived! 🎉</span>
-        <span class="live-map-info-sub">"Confirm delivered" is unlocked below.</span>
-      </template>
-      <template v-else-if="status === 'tracking' && remaining !== null">
-        <span class="live-map-info-main">{{ offRoute ? "~" : "" }}{{ formatDistance(remaining) }} to go</span>
-        <span class="live-map-info-sub">
-          {{ offRoute ? "Taking another way — the map follows you." : `to ${ROUTE.destination.name}` }}
-        </span>
-      </template>
-      <template v-else-if="status === 'requesting'">
-        <span class="live-map-info-main">Finding you…</span>
-        <span class="live-map-info-sub">Allow location access when your phone asks.</span>
-      </template>
-      <template v-else-if="status === 'denied'">
-        <span class="live-map-info-main">Location is off</span>
-        <span class="live-map-info-sub">The route still works — turn location on in your browser settings to see yourself.</span>
-      </template>
-      <template v-else-if="status === 'unavailable'">
-        <span class="live-map-info-main">No GPS signal</span>
-        <span class="live-map-info-sub">Just follow the route — the game works without it.</span>
-      </template>
-      <template v-else>
-        <span class="live-map-info-main">{{ formatDistance(ROUTE.distanceMeters) }} ride</span>
-        <span class="live-map-info-sub">to {{ ROUTE.destination.name }}</span>
-      </template>
+      <span class="live-map-info-text">
+        <template v-if="arrived">
+          <span class="live-map-info-main live-map-info-arrived">You've arrived! 🎉</span>
+          <span class="live-map-info-sub">"Confirm delivered" is unlocked below.</span>
+        </template>
+        <template v-else-if="status === 'tracking' && remaining !== null">
+          <span class="live-map-info-main">{{ offRoute ? "~" : "" }}{{ formatDistance(remaining) }} to go</span>
+          <span class="live-map-info-sub">
+            {{ offRoute ? "Taking another way — the map follows you." : `to ${ROUTE.destination.name}` }}
+          </span>
+        </template>
+        <template v-else-if="status === 'requesting'">
+          <span class="live-map-info-main">Finding you…</span>
+          <span class="live-map-info-sub">Allow location access when your phone asks.</span>
+        </template>
+        <template v-else-if="status === 'denied'">
+          <span class="live-map-info-main">Location is off</span>
+          <span class="live-map-info-sub">The route still works — turn location on in your browser settings to see yourself.</span>
+        </template>
+        <template v-else-if="status === 'unavailable'">
+          <span class="live-map-info-main">No GPS signal</span>
+          <span class="live-map-info-sub">Just follow the route — the game works without it.</span>
+        </template>
+        <template v-else>
+          <span class="live-map-info-main">{{ formatDistance(ROUTE.distanceMeters) }} ride</span>
+          <span class="live-map-info-sub">to {{ ROUTE.destination.name }}</span>
+        </template>
+      </span>
+
+      <span class="live-map-legend" aria-hidden="true">
+        <span><i class="live-map-legend-trail"></i>Your ride</span>
+        <span><i class="live-map-legend-plan"></i>Suggested</span>
+      </span>
     </figcaption>
-
-    <p class="live-map-legend" aria-hidden="true">
-      <span><i class="live-map-legend-trail"></i>Your ride</span>
-      <span><i class="live-map-legend-plan"></i>Suggested route</span>
-    </p>
-
-    <p class="live-map-safety">🛵 Hold on tight and keep a firm grip on your phone.</p>
   </figure>
 </template>
 
@@ -240,7 +240,8 @@ const recenter = () => {
   overflow: hidden;
 
   &-canvas {
-    height: 300px;
+    // The order screen makes this taller while riding.
+    height: var(--live-map-height, 300px);
     background: #0b1730;
     z-index: 0;
 
@@ -314,7 +315,7 @@ const recenter = () => {
   &-overlay {
     position: absolute;
     inset: 0 0 auto;
-    height: 300px;
+    height: var(--live-map-height, 300px);
     z-index: 500;
     display: flex;
     flex-direction: column;
@@ -372,10 +373,17 @@ const recenter = () => {
 
   &-info {
     display: flex;
-    flex-direction: column;
-    gap: 2px;
-    padding: var(--space-sm) var(--space-md);
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-sm);
+    padding: 8px var(--space-md);
     border-top: 1px solid rgba(52, 191, 255, 0.2);
+
+    &-text {
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
 
     &-main {
       font-size: 17px;
@@ -388,16 +396,17 @@ const recenter = () => {
     }
 
     &-sub {
-      font-size: 13px;
+      font-size: 12px;
       color: var(--color-text-300);
     }
   }
 
   &-legend {
+    flex-shrink: 0;
     display: flex;
-    gap: var(--space-md);
-    padding: 0 var(--space-md) var(--space-sm);
-    font-size: 12px;
+    flex-direction: column;
+    gap: 2px;
+    font-size: 11px;
     color: var(--color-text-300);
 
     span {
@@ -421,15 +430,6 @@ const recenter = () => {
     &-plan {
       background: repeating-linear-gradient(90deg, var(--color-amber-400) 0 3px, transparent 3px 7px);
     }
-  }
-
-  &-safety {
-    padding: 8px var(--space-md);
-    background: rgba(255, 176, 32, 0.1);
-    border-top: 1px solid rgba(255, 176, 32, 0.25);
-    font-size: 12px;
-    font-weight: 700;
-    color: var(--color-amber-300);
   }
 }
 

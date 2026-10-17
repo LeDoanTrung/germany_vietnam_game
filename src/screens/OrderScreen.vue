@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, defineAsyncComponent, h, onBeforeUnmount, ref, watch } from "vue";
+import { computed, defineAsyncComponent, onBeforeUnmount, onErrorCaptured, ref, watch } from "vue";
 import AppHeader from "../components/AppHeader.vue";
 import HoloPanel from "../components/HoloPanel.vue";
 import ScrambleText from "../components/ScrambleText.vue";
@@ -22,19 +22,14 @@ import { useWakeLock } from "../composables/useWakeLock";
 import { distanceMeters, formatDistance, isWithinDelivery } from "../utils/geo";
 
 // The real map pulls in Leaflet, so it only loads once someone is actually riding.
-// A failed load (flaky network, or a page left open across a deploy) used to
-// leave a blank gap: retry twice, then offer a reload instead.
+// A failed load (flaky network, or a page left open across a deploy) is
+// retried twice; after that onErrorCaptured below shows a Reload button.
 const LiveMap = defineAsyncComponent({
   loader: () => import("../components/LiveMap.vue"),
   onError: (_error, retry, fail, attempts) => {
     if (attempts <= 2) window.setTimeout(retry, 1000 * attempts);
     else fail();
   },
-  errorComponent: () =>
-    h("div", { class: "order-map-error" }, [
-      h("p", "The live map couldn't load."),
-      h("button", { type: "button", onClick: () => window.location.reload() }, "↻ Reload"),
-    ]),
 });
 
 // One frame for the whole order, as the client described it: "Accept order"
@@ -66,6 +61,20 @@ const MAP_MODE = { available: "waiting", delivering: "delivering", delivered: "d
 /** While riding, the player can flip between the real map and the cartoon one. */
 const mapView = ref<"live" | "animated">("live");
 const showLiveMap = computed(() => isMine.value && status.value === "delivering" && mapView.value === "live");
+
+// Anything going wrong inside the map (it failed to load, or crashed) used to
+// leave a blank gap. Show a Reload button there instead; the rest keeps working.
+const liveMapCrashed = ref(false);
+onErrorCaptured((error) => {
+  if (!showLiveMap.value) return;
+  console.error("Live map failed.", error);
+  liveMapCrashed.value = true;
+  return false;
+});
+const reloadPage = () => window.location.reload();
+
+/** The folded order/gate strip at the top while riding. */
+const tripOpen = ref(false);
 
 const handleAccept = () => {
   sounds.confirm();
@@ -121,6 +130,17 @@ const organiserUnlocked = ref(readUnlocked());
 watch(unlockKey, () => (organiserUnlocked.value = readUnlocked()));
 
 const canConfirm = computed(() => nearDestination.value || organiserUnlocked.value);
+
+/** GPS can't unlock the button: say why and offer Try again. */
+const locationProblem = computed(
+  () => !canConfirm.value && (gpsStatus.value === "denied" || gpsStatus.value === "unavailable" || approximateOnly.value),
+);
+/** What the locked "Confirm delivered" button says instead. */
+const lockedLabel = computed(() => {
+  if (gpsStatus.value === "requesting") return "Finding your location…";
+  if (distanceLeft.value !== null) return `${formatDistance(distanceLeft.value)} to go`;
+  return "Locked until you arrive";
+});
 
 const showCodeForm = ref(false);
 const codeInput = ref("");
@@ -252,63 +272,96 @@ const setMapView = (view: "live" | "animated") => {
     <AppHeader :title="`Order ${currentOrder.number}`" show-back :earnings="earnings" @back="back" />
 
     <div class="order-content">
-      <StatusStepper :current="STEP_FOR_STATUS[status]" />
+      <StatusStepper v-if="!isRiding" :current="STEP_FOR_STATUS[status]" />
 
-      <!-- Keyed on status so the panel scans in again whenever the status changes. -->
-      <HoloPanel :key="status" class="order-headline" :tone="status === 'delivered' ? 'green' : status === 'available' ? 'cyan' : 'amber'">
-        <StatusBadge :status="status" />
-        <h2 class="order-title">
-          Deliver <ScrambleText :text="currentOrder.item" class="order-title-item" :delay="0.15" />
-          <small>× {{ currentOrder.quantity }}</small>
-        </h2>
-        <p class="order-route">
-          from <b>Gate {{ currentOrder.gate }}</b> to <b>{{ currentOrder.to.name }}</b>
-        </p>
-        <p :class="['order-status', `order-status-${status}`]">
-          {{ statusSentence(status, claim?.shipper)
-          }}<span v-if="status !== 'delivered'" class="order-status-dots" aria-hidden="true"></span>
-        </p>
-      </HoloPanel>
-
-      <!-- Where to stand: revealed once the player has taken the order. -->
-      <HoloPanel v-if="isMine" tone="amber" class="order-gate">
-        <span class="order-gate-number" aria-hidden="true">{{ currentOrder.gate }}</span>
-        <span>
-          <span class="order-gate-label">Your pick-up point</span>
-          <span class="order-gate-text">Wait at <b>Gate {{ currentOrder.gate }}</b></span>
-          <span v-if="gate?.hint" class="order-gate-hint">{{ gate.hint }}</span>
-          <span class="order-gate-place">{{ currentOrder.from.address }}</span>
+      <!-- While riding the map is the main thing: the order and the gate shrink
+           to one tappable strip with the details folded away. -->
+      <button
+        v-if="isRiding"
+        type="button"
+        class="order-trip"
+        :aria-expanded="tripOpen"
+        @click="tripOpen = !tripOpen"
+      >
+        <span class="order-gate-number order-trip-gate" aria-hidden="true">{{ currentOrder.gate }}</span>
+        <span class="order-trip-body">
+          <span class="order-trip-title">
+            Wait at <b>Gate {{ currentOrder.gate }}</b> · {{ currentOrder.item }} × {{ currentOrder.quantity }}
+          </span>
+          <span v-if="gate?.hint" :class="['order-gate-hint', { 'order-trip-clamp': !tripOpen }]">{{ gate.hint }}</span>
+          <span v-if="tripOpen" class="order-gate-place">{{ currentOrder.from.address }}</span>
         </span>
-      </HoloPanel>
+        <span class="order-trip-chevron" aria-hidden="true">{{ tripOpen ? "▴" : "▾" }}</span>
+      </button>
 
-      <div v-if="isMine && status === 'delivering'" class="order-map-toggle" role="group" aria-label="Map view">
-        <button type="button" :aria-pressed="mapView === 'live'" @click="setMapView('live')">📍 Live map</button>
-        <button type="button" :aria-pressed="mapView === 'animated'" @click="setMapView('animated')">✨ Animation</button>
+      <template v-else>
+        <!-- Keyed on status so the panel scans in again whenever the status changes. -->
+        <HoloPanel :key="status" class="order-headline" :tone="status === 'delivered' ? 'green' : status === 'available' ? 'cyan' : 'amber'">
+          <StatusBadge :status="status" />
+          <h2 class="order-title">
+            Deliver <ScrambleText :text="currentOrder.item" class="order-title-item" :delay="0.15" />
+            <small>× {{ currentOrder.quantity }}</small>
+          </h2>
+          <p class="order-route">
+            from <b>Gate {{ currentOrder.gate }}</b> to <b>{{ currentOrder.to.name }}</b>
+          </p>
+          <p :class="['order-status', `order-status-${status}`]">
+            {{ statusSentence(status, claim?.shipper)
+            }}<span v-if="status !== 'delivered'" class="order-status-dots" aria-hidden="true"></span>
+          </p>
+        </HoloPanel>
+
+        <!-- Where to stand: revealed once the player has taken the order. -->
+        <HoloPanel v-if="isMine" tone="amber" class="order-gate">
+          <span class="order-gate-number" aria-hidden="true">{{ currentOrder.gate }}</span>
+          <span>
+            <span class="order-gate-label">Your pick-up point</span>
+            <span class="order-gate-text">Wait at <b>Gate {{ currentOrder.gate }}</b></span>
+            <span v-if="gate?.hint" class="order-gate-hint">{{ gate.hint }}</span>
+            <span class="order-gate-place">{{ currentOrder.from.address }}</span>
+          </span>
+        </HoloPanel>
+      </template>
+
+      <div :class="['order-map', { 'order-map-riding': isRiding }]">
+        <!-- Floats on the map instead of taking a row of its own. -->
+        <div v-if="isRiding" class="order-map-toggle" role="group" aria-label="Map view">
+          <button type="button" :aria-pressed="mapView === 'live'" @click="setMapView('live')">📍 Live</button>
+          <button type="button" :aria-pressed="mapView === 'animated'" @click="setMapView('animated')">✨ Cartoon</button>
+        </div>
+
+        <div v-if="showLiveMap && liveMapCrashed" class="order-map-error">
+          <p>The live map couldn't load.</p>
+          <button type="button" @click="reloadPage">↻ Reload</button>
+        </div>
+        <LiveMap
+          v-else-if="showLiveMap"
+          :gate="currentOrder.gate"
+          :gate-coords="gate?.coords ?? null"
+          :order-id="currentOrder.id"
+        />
+        <RouteMap v-else :order="currentOrder" :mode="MAP_MODE[status]" />
       </div>
 
-      <LiveMap
-        v-if="showLiveMap"
-        :gate="currentOrder.gate"
-        :gate-coords="gate?.coords ?? null"
-        :order-id="currentOrder.id"
-      />
-      <RouteMap v-else :order="currentOrder" :mode="MAP_MODE[status]" />
-
-      <HoloPanel :delay="0.2">
-        <InfoRow label="Shipper" badge="🛵" highlight>{{ claim?.shipper ?? "Not taken yet" }}</InfoRow>
-        <InfoRow label="Start point" :badge="currentOrder.from.label">
-          {{ currentOrder.from.name }}
-          <small>{{ currentOrder.from.address }}</small>
-        </InfoRow>
-        <InfoRow label="End point" :badge="currentOrder.to.label">
-          {{ currentOrder.to.name }}
-          <small>{{ currentOrder.to.address }}</small>
-        </InfoRow>
-        <InfoRow label="Distance · Shipping fee">
-          {{ currentOrder.distanceKm }} km · <span class="order-reward mono">{{ formatVnd(currentOrder.reward) }}</span>
-        </InfoRow>
-        <InfoRow v-if="currentOrder.note" label="Note">{{ currentOrder.note }}</InfoRow>
-      </HoloPanel>
+      <!-- Folded away while riding; open otherwise. -->
+      <component :is="isRiding ? 'details' : 'div'" class="order-details">
+        <summary v-if="isRiding">Order details</summary>
+        <HoloPanel :delay="isRiding ? 0 : 0.2">
+          <InfoRow label="Shipper" badge="🛵" highlight>{{ claim?.shipper ?? "Not taken yet" }}</InfoRow>
+          <InfoRow label="Start point" :badge="currentOrder.from.label">
+            {{ currentOrder.from.name }}
+            <small>{{ currentOrder.from.address }}</small>
+          </InfoRow>
+          <InfoRow label="End point" :badge="currentOrder.to.label">
+            {{ currentOrder.to.name }}
+            <small>{{ currentOrder.to.address }}</small>
+          </InfoRow>
+          <InfoRow label="Distance · Shipping fee">
+            {{ currentOrder.distanceKm }} km · <span class="order-reward mono">{{ formatVnd(currentOrder.reward) }}</span>
+          </InfoRow>
+          <InfoRow v-if="currentOrder.note" label="Note">{{ currentOrder.note }}</InfoRow>
+        </HoloPanel>
+      </component>
     </div>
 
     <ActionBar>
@@ -329,43 +382,32 @@ const setMapView = (view: "live" | "animated") => {
 
       <!-- My order, on the way: locked until the rider reaches the destination -->
       <template v-else-if="isRiding">
-        <div v-if="!canConfirm" class="order-gate-status" aria-live="polite">
+        <!-- Only problems get a message; a normal ride is summed up on the button itself. -->
+        <div v-if="locationProblem" class="order-gate-status" aria-live="polite">
           <template v-if="approximateOnly">
-            📍 Your phone only shares an <b>approximate</b> location. Switch <b>Precise Location</b> on for this
-            browser in your phone's Settings, then tap Try again.
+            📍 Only an <b>approximate</b> location. Switch <b>Precise Location</b> on for this browser in Settings, then
+            tap Try again.
           </template>
-          <template v-else-if="gpsStatus === 'tracking' && distanceLeft !== null">
-            🔒 Get within {{ DELIVERY.radiusMeters }} m of {{ currentOrder.to.name }} to confirm —
-            <b>{{ formatDistance(distanceLeft) }} away</b>
-          </template>
-          <template v-else-if="gpsStatus === 'requesting'">📍 Finding your location… allow it when your phone asks.</template>
-          <template v-else-if="gpsStatus === 'denied'">
-            📍 Location is off. Turn it on in your browser settings, or ask the organiser for the unlock code.
-          </template>
-          <template v-else-if="gpsStatus === 'unavailable'">
-            📍 No GPS signal. Move into the open, or ask the organiser for the unlock code.
-          </template>
-          <template v-else>🔒 "Confirm delivered" unlocks when you reach {{ currentOrder.to.name }}.</template>
-          <LocationHelp v-if="gpsStatus === 'denied' || gpsStatus === 'unavailable' || approximateOnly" class="order-location-help" />
+          <template v-else-if="gpsStatus === 'denied'">📍 Location is off — turn it on, or ask the organiser for the code.</template>
+          <template v-else>📍 No GPS signal — move into the open, or ask the organiser for the code.</template>
+          <LocationHelp class="order-location-help" />
         </div>
 
         <GameButton v-if="gpsStatus === 'idle' && !canConfirm" block @click="handleTurnOnLocation">
           📍 Turn on location
         </GameButton>
-        <GameButton
-          v-else-if="!canConfirm && (gpsStatus === 'denied' || gpsStatus === 'unavailable' || approximateOnly)"
-          block
-          :tap-sound="false"
-          @click="handleRetryLocation"
-        >
+        <GameButton v-else-if="locationProblem" block :tap-sound="false" @click="handleRetryLocation">
           📍 Try again
         </GameButton>
 
         <GameButton
+          v-else
           variant="success"
           block
+          :class="{ 'order-confirm-locked': !canConfirm }"
           :disabled="state.busy || !canConfirm"
           :tap-sound="false"
+          :aria-label="canConfirm ? 'Confirm delivered' : `Confirm delivered — locked, ${lockedLabel}`"
           @click="handleDelivered"
         >
           <svg class="order-button-icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -378,40 +420,44 @@ const setMapView = (view: "live" | "animated") => {
               <path d="M8 11V8a4 4 0 0 1 8 0v3" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" />
             </template>
           </svg>
-          Confirm delivered
+          <span v-if="canConfirm">Confirm delivered</span>
+          <span v-else class="order-confirm-text">
+            {{ lockedLabel }}
+            <small>Unlocks within {{ DELIVERY.radiusMeters }} m of the drop-off</small>
+          </span>
         </GameButton>
 
-        <!-- Organiser override -->
-        <template v-if="!canConfirm">
-          <form v-if="showCodeForm" class="order-code" @submit.prevent="submitCode">
-            <input
-              v-model="codeInput"
-              class="order-code-input"
-              type="text"
-              inputmode="text"
-              autocapitalize="characters"
-              autocomplete="off"
-              placeholder="Organiser code"
-              aria-label="Organiser unlock code"
-            />
-            <GameButton type="submit" variant="ghost">Unlock</GameButton>
-          </form>
-          <button v-else type="button" class="order-code-link" @click="showCodeForm = true">
-            Can't get a GPS fix? Enter the organiser code
-          </button>
-        </template>
+        <form v-if="showCodeForm && !canConfirm" class="order-code" @submit.prevent="submitCode">
+          <input
+            v-model="codeInput"
+            class="order-code-input"
+            type="text"
+            inputmode="text"
+            autocapitalize="characters"
+            autocomplete="off"
+            placeholder="Organiser code"
+            aria-label="Organiser unlock code"
+          />
+          <GameButton type="submit" variant="ghost">Unlock</GameButton>
+        </form>
 
-        <!-- Picked the wrong order: give it back while still at the gate -->
-        <button
-          v-if="releasable"
-          type="button"
-          :class="['order-release', { 'order-release-confirm': confirmingRelease }]"
-          :disabled="state.busy"
-          @click="handleRelease"
-        >
-          <template v-if="confirmingRelease">Tap again to release Order {{ currentOrder.number }}</template>
-          <template v-else>Wrong order? Release it ({{ releaseMinutesLeft }} min left)</template>
-        </button>
+        <!-- Secondary actions share one quiet row. -->
+        <div v-if="(!canConfirm && !showCodeForm) || releasable" class="order-more">
+          <button v-if="!canConfirm && !showCodeForm" type="button" class="order-more-link" @click="showCodeForm = true">
+            🔑 Organiser code
+          </button>
+          <!-- Picked the wrong order: give it back while still at the gate -->
+          <button
+            v-if="releasable"
+            type="button"
+            :class="['order-more-link', 'order-release', { 'order-release-confirm': confirmingRelease }]"
+            :disabled="state.busy"
+            @click="handleRelease"
+          >
+            <template v-if="confirmingRelease">Tap again to release</template>
+            <template v-else>↩ Wrong order? ({{ releaseMinutesLeft }} min)</template>
+          </button>
+        </div>
       </template>
 
       <!-- Someone else's order, or finished -->
@@ -542,22 +588,91 @@ const setMapView = (view: "live" | "animated") => {
     }
   }
 
+  // The folded order + gate strip shown while riding.
+  &-trip {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid rgba(255, 176, 32, 0.55);
+    border-radius: var(--radius-md);
+    background: rgba(10, 30, 66, 0.85);
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+
+    &-gate {
+      width: 46px;
+      height: 46px;
+      font-size: 26px;
+      box-shadow: 0 0 16px rgba(255, 176, 32, 0.45);
+    }
+
+    &-body {
+      flex: 1;
+      min-width: 0;
+    }
+
+    &-title {
+      display: block;
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--color-text-300);
+
+      b {
+        font-size: 18px;
+        font-weight: 900;
+        color: var(--color-text-100);
+      }
+    }
+
+    &-clamp {
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    }
+
+    &-chevron {
+      flex-shrink: 0;
+      color: var(--color-amber-300);
+      font-size: 14px;
+    }
+  }
+
+  &-map {
+    position: relative;
+
+    // While riding the map takes whatever height the strip and the buttons leave.
+    &-riding {
+      --live-map-height: max(300px, calc(100vh - 330px));
+      --live-map-height: max(300px, calc(100dvh - 330px));
+    }
+  }
+
+  // Small switch floating on the map's top-left corner.
   &-map-toggle {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    padding: 4px;
-    border: 1px solid rgba(52, 191, 255, 0.35);
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    z-index: 2;
+    display: flex;
+    padding: 3px;
+    border: 1px solid rgba(52, 191, 255, 0.45);
     border-radius: var(--radius-pill);
-    background: rgba(2, 10, 28, 0.5);
+    background: rgba(2, 10, 28, 0.88);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
 
     button {
-      min-height: 40px;
+      min-height: 34px;
+      padding: 0 12px;
       border: none;
       border-radius: var(--radius-pill);
       background: transparent;
       color: var(--color-text-300);
       font-weight: 700;
-      font-size: 14px;
+      font-size: 13px;
       cursor: pointer;
       transition:
         background-color 0.2s ease,
@@ -570,23 +685,55 @@ const setMapView = (view: "live" | "animated") => {
     }
   }
 
+  // "Order details", folded while riding.
+  &-details > summary {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 44px;
+    border: 1px dashed rgba(52, 191, 255, 0.4);
+    border-radius: var(--radius-pill);
+    color: var(--color-cyan-100);
+    font-size: 14px;
+    font-weight: 700;
+    list-style: none;
+    cursor: pointer;
+
+    &::-webkit-details-marker {
+      display: none;
+    }
+
+    &::after {
+      content: "▾";
+      margin-left: 6px;
+    }
+  }
+
+  &-details[open] > summary {
+    margin-bottom: var(--space-sm);
+
+    &::after {
+      content: "▴";
+    }
+  }
+
   // Shown in place of the live map if it can't be loaded.
   &-map-error {
     display: grid;
     justify-items: center;
     gap: 10px;
-    padding: 28px 16px;
+    padding: 72px 16px 28px;
     border: 1px solid rgba(52, 191, 255, 0.35);
     border-radius: var(--radius-md);
     background: rgba(2, 10, 28, 0.6);
     color: var(--color-text-300);
     text-align: center;
 
-    :deep(p) {
+    p {
       margin: 0;
     }
 
-    :deep(button) {
+    button {
       min-height: 40px;
       padding: 0 20px;
       border: none;
@@ -652,31 +799,48 @@ const setMapView = (view: "live" | "animated") => {
     color: var(--color-amber-300);
   }
 
-  &-release {
-    min-height: 40px;
-    border: 1px dashed rgba(255, 93, 108, 0.5);
-    border-radius: var(--radius-pill);
-    background: transparent;
-    color: var(--color-text-300);
-    font-size: 13px;
-    font-weight: 700;
-    cursor: pointer;
+  // Two lines on the locked button: how far, then what unlocks it.
+  &-confirm-text {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    line-height: 1.15;
 
-    &-confirm {
-      border-style: solid;
-      background: var(--color-red-400);
-      color: #fff;
+    small {
+      font-size: 12px;
+      font-weight: 600;
+      opacity: 0.85;
     }
   }
 
-  &-code-link {
-    min-height: 36px;
-    border: none;
-    background: none;
-    color: var(--color-text-300);
-    font-size: 13px;
-    text-decoration: underline;
-    cursor: pointer;
+  // Organiser code + release: one quiet row under the main button.
+  &-more {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: var(--space-xs);
+
+    &-link {
+      min-height: 36px;
+      padding: 0 14px;
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      border-radius: var(--radius-pill);
+      background: rgba(2, 10, 28, 0.6);
+      color: var(--color-text-300);
+      font-size: 13px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+  }
+
+  &-release {
+    border-color: rgba(255, 93, 108, 0.45);
+
+    &-confirm {
+      border-color: var(--color-red-400);
+      background: var(--color-red-400);
+      color: #fff;
+    }
   }
 
   &-hint {
