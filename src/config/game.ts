@@ -98,22 +98,18 @@ export const ORDER_COUNT = 15;
 /** Every order starts at one of these gates of the host university. */
 const GATES = GATE_INFO.map((info) => info.number);
 
-// What's in each parcel. Dealt out in turn, so the list can be shorter than ORDER_COUNT.
-const PARCELS: { item: string; quantity: number; reward: number; note?: string }[] = [
-  { item: "Glass of beer", quantity: 1, reward: 25000, note: "Fragile — keep the glass upright." },
-  { item: "Case of 24 beers", quantity: 2, reward: 42000 },
-  { item: "Set of glasses", quantity: 6, reward: 30000, note: "Handle with care." },
-  { item: "Crate of soft drinks", quantity: 1, reward: 18000 },
-  { item: "Birthday cake", quantity: 1, reward: 22000, note: "Keep it level — do not stack." },
-  { item: "Box of snacks", quantity: 3, reward: 20000 },
-];
+// Every order carries the same thing (client: "KLU gift set is enough");
+// only the shipping fee varies, dealt out in turn.
+const PARCEL = { item: "KLU gift set", quantity: 1 };
+const REWARDS = [25000, 42000, 30000, 18000, 22000, 20000];
 
 const destination: Place = { label: "B", name: ROUTE.destination.name, address: ROUTE.destination.address };
 
 export const ORDERS: Order[] = Array.from({ length: ORDER_COUNT }, (_, index) => {
   const gate = GATES[index % GATES.length]!;
   return {
-    ...PARCELS[index % PARCELS.length]!,
+    ...PARCEL,
+    reward: REWARDS[index % REWARDS.length]!,
     id: `o${index + 1}`,
     number: index + 1,
     gate,
