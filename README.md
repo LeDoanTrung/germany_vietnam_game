@@ -7,7 +7,7 @@ GitHub Pages. The only backend is Firebase, which keeps the order list in sync s
 
 1. **Home screen** (hand-drawn poster theme, KLU and Learn Logistics logos): type your name, tap **START**. If the name
    is already on someone's order, the player is asked to add an initial. Before taking an order they can still change it.
-2. A notification drops in: *"14 orders need handling"*. Tap it to open the **order list**. Orders other players
+2. A notification drops in: *"15 orders need handling"*. Tap it to open the **order list**. Orders other players
    already took are locked (🔒).
 3. Pick an order (or use **Random draw**) and tap **Accept order**. Each player takes one order, and nobody else can
    take it afterwards. The order shows where to wait (**Gate 1, 2 or 3** of HCMC University of Technology) and a

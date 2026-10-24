@@ -92,7 +92,8 @@ export const gateInfo = (gate: number) => GATE_INFO.find((info) => info.number =
  * the random draw); once someone takes an order nobody else can.
  */
 // ~12 people in the group, plus two spares for late joiners or a mistaken order.
-export const ORDER_COUNT = 14;
+// 15 orders, dealt round the 3 gates in turn: 5 orders per gate.
+export const ORDER_COUNT = 15;
 
 /** Every order starts at one of these gates of the host university. */
 const GATES = GATE_INFO.map((info) => info.number);

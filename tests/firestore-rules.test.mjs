@@ -73,6 +73,57 @@ test("two players tapping the same order at once: exactly one gets it", async ()
   assert.equal(saved.uid, winner);
 });
 
+// The client's question: 13 players all pressing "Random draw" at the same
+// moment, 15 orders. Each draw lands on a random order; a player who loses the
+// race (the app says "someone just took this order") draws again from what's left.
+const PLAYERS_13 = Array.from({ length: 13 }, (_, index) => `player${index + 1}`);
+const ORDERS_15 = Array.from({ length: 15 }, (_, index) => `o${index + 1}`);
+
+const readAllOrders = async () => {
+  let orders = [];
+  await env.withSecurityRulesDisabled(async (ctx) => {
+    const db = ctx.firestore();
+    const snaps = await Promise.all(ORDERS_15.map((id) => getDoc(orderRef(db, id))));
+    orders = snaps.filter((snap) => snap.exists()).map((snap) => ({ id: snap.id, ...snap.data() }));
+  });
+  return orders;
+};
+
+test("13 players hitting the same order at the same moment: exactly one gets it", async () => {
+  const results = await Promise.all(PLAYERS_13.map((uid) => claim(phone(uid), uid, "o7", uid)));
+  assert.equal(results.filter((result) => result === "ok").length, 1);
+  assert.equal(results.filter((result) => result === "taken").length, 12);
+  const orders = await readAllOrders();
+  assert.equal(orders.length, 1);
+  assert.equal(orders[0].uid, PLAYERS_13[results.indexOf("ok")]);
+});
+
+test("13 players pressing Random draw at once over 15 orders: no order is shared", async () => {
+  for (let round = 0; round < 5; round++) {
+    await env.clearFirestore();
+    const tried = new Map(PLAYERS_13.map((uid) => [uid, new Set()]));
+    const play = async (uid) => {
+      const db = phone(uid);
+      for (;;) {
+        const left = ORDERS_15.filter((id) => !tried.get(uid).has(id));
+        const pick = left[Math.floor(Math.random() * left.length)];
+        tried.get(uid).add(pick);
+        const result = await claim(db, uid, pick, uid);
+        if (result === "ok") return pick;
+        assert.equal(result, "taken");
+      }
+    };
+    const picks = await Promise.all(PLAYERS_13.map(play));
+
+    // Everyone ends up with an order, and no two players hold the same one.
+    assert.equal(new Set(picks).size, 13, `duplicate pick: ${picks}`);
+    const orders = await readAllOrders();
+    assert.equal(orders.length, 13);
+    assert.equal(new Set(orders.map((order) => order.uid)).size, 13);
+    for (const order of orders) assert.equal(picks[PLAYERS_13.indexOf(order.uid)], order.id);
+  }
+});
+
 test("a player can only take one order", async () => {
   await claim(phone("alex"), "alex", "o1", "Alex");
   assert.equal(await claim(phone("alex"), "alex", "o2", "Alex"), "already-has-order");
