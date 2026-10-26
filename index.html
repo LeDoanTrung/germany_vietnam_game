@@ -6,10 +6,58 @@
     <meta name="theme-color" content="#04122e" />
     <title>PhD Workshop 2026 – Shipper Role-Play Game</title>
     <link rel="icon" type="image/svg+xml" href="/germany_vietnam_game/favicon.svg" />
-    <script type="module" crossorigin src="/germany_vietnam_game/assets/index-i6Ic0Gow.js"></script>
+    <!-- In <head> so it is listening before the game's own scripts (which the
+         build also puts in <head>) start downloading. -->
+    <script>
+      (function () {
+        var failed = false;
+        function fail(reason) {
+          if (window.__gameStarted || failed) return;
+          failed = true;
+          function show() {
+            document.getElementById("boot-fail").style.display = "flex";
+            document.getElementById("boot-fail-detail").textContent = reason + " · " + navigator.userAgent;
+          }
+          if (document.getElementById("boot-fail")) show();
+          else document.addEventListener("DOMContentLoaded", show);
+        }
+        // A script or stylesheet of the game failed to download.
+        window.addEventListener(
+          "error",
+          function (event) {
+            var el = event.target;
+            var isCode = el && (el.tagName === "SCRIPT" || (el.tagName === "LINK" && /stylesheet|modulepreload/.test(el.rel)));
+            if (isCode) fail("Couldn't download " + (el.src || el.href));
+          },
+          true,
+        );
+        // Downloaded but never started (too old a browser, or a very slow network).
+        setTimeout(function () {
+          fail("Didn't start within 20 s");
+        }, 20000);
+      })();
+    </script>
+    <script type="module" crossorigin src="/germany_vietnam_game/assets/index-B-rBf0MC.js"></script>
     <link rel="stylesheet" crossorigin href="/germany_vietnam_game/assets/index-DZTiDRMi.css">
   </head>
   <body>
     <div id="app"></div>
+
+    <!-- Shown instead of a blank page if the game can't start (a network that
+         blocks part of the site, a very old phone, a strict in-app browser).
+         Plain HTML + old-style JS on purpose, so it works where the app doesn't. -->
+    <div id="boot-fail" style="position:fixed;inset:0;z-index:99;display:none;align-items:center;justify-content:center;padding:24px;background:#04122e;color:#eaf4ff;font:16px/1.45 system-ui,-apple-system,sans-serif">
+      <div style="max-width:340px">
+        <p style="margin:0 0 8px;font-size:22px;font-weight:800">The game didn't load 😕</p>
+        <p style="margin:0 0 12px;color:#9fb6d8">Try these, then tap Reload:</p>
+        <ol style="margin:0 0 18px;padding-left:20px">
+          <li>Switch between <b>Wi-Fi</b> and <b>mobile data</b>.</li>
+          <li>Open the link in <b>Safari</b> or <b>Chrome</b>, not inside WhatsApp, Zalo or Messenger.</li>
+          <li>Still stuck? Show this screen to the organiser.</li>
+        </ol>
+        <button type="button" onclick="location.reload()" style="width:100%;min-height:48px;border:0;border-radius:999px;background:#34bfff;color:#001a2e;font:inherit;font-weight:800">↻ Reload</button>
+        <p id="boot-fail-detail" style="margin:14px 0 0;color:#6f86a8;font-size:12px;word-break:break-word"></p>
+      </div>
+    </div>
   </body>
 </html>
