@@ -74,10 +74,24 @@ onMounted(() => {
   if (!mapRef.value) return;
 
   map = L.map(mapRef.value, { zoomControl: false, scrollWheelZoom: false, attributionControl: true });
-  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+  // Some mobile networks can't reach the OSM tile servers, which left a blank
+  // map. If the first tiles keep failing, switch to Esri's street map, which
+  // is served from a different network and needs no API key.
+  const osm = L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
     maxZoom: 19,
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
   }).addTo(map);
+  let osmLoaded = 0;
+  let osmFailed = 0;
+  osm.on("tileload", () => osmLoaded++);
+  osm.on("tileerror", () => {
+    if (++osmFailed < 4 || osmLoaded > 0 || !map) return;
+    osm.remove();
+    L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}", {
+      maxZoom: 19,
+      attribution: "Tiles &copy; Esri",
+    }).addTo(map);
+  });
   L.control.zoom({ position: "bottomright" }).addTo(map);
 
   // Planned route: faint and dashed — the tour operator may choose another way.

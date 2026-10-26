@@ -29,3 +29,6 @@ window.addEventListener("vite:preloadError", (event) => {
 });
 
 createApp(App).mount("#app");
+// Tells the fallback in index.html that the game started (no "didn't load" screen).
+(window as Window & { __gameStarted?: boolean }).__gameStarted = true;
+document.getElementById("boot-fail")?.remove();
