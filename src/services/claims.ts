@@ -159,10 +159,26 @@ const createFirebaseBackend = async (): Promise<ClaimsBackend> => {
   const playerRef = doc(db, "rounds", ROUND_ID, "players", uid);
   const settingsRef = doc(db, "rounds", ROUND_ID, "settings", "main");
 
+  // Transactions aren't applied to the local cache, so after "Accept order"
+  // the UI used to wait for the server to push the change back down the live
+  // listener. On a slow or crowded network that took 25 s+ and the phone looked
+  // frozen (order taken on the server, still "Available" on screen). Orders
+  // this phone just won are shown straight away from here until the listener
+  // catches up.
+  const justClaimed: Record<string, Claim> = {};
+  let serverClaims: Record<string, Claim> = {};
+  const listeners = new Set<(claims: Record<string, Claim>) => void>();
+  const emit = () => {
+    for (const id of Object.keys(justClaimed)) if (serverClaims[id]) delete justClaimed[id];
+    const merged = { ...justClaimed, ...serverClaims };
+    listeners.forEach((listener) => listener(merged));
+  };
+
   return {
     mode: "online",
     subscribe(onChange) {
-      return onSnapshot(ordersRef, (snapshot) => {
+      listeners.add(onChange);
+      const stop = onSnapshot(ordersRef, (snapshot) => {
         const claims: Record<string, Claim> = {};
         snapshot.forEach((entry) => {
           const data = entry.data({ serverTimestamps: "estimate" }) as {
@@ -178,8 +194,13 @@ const createFirebaseBackend = async (): Promise<ClaimsBackend> => {
             claimedAt: data.claimedAt?.toMillis() ?? Date.now(),
           };
         });
-        onChange(claims);
+        serverClaims = claims;
+        emit();
       });
+      return () => {
+        listeners.delete(onChange);
+        stop();
+      };
     },
     subscribeSettings(onChange) {
       return onSnapshot(
@@ -196,9 +217,12 @@ const createFirebaseBackend = async (): Promise<ClaimsBackend> => {
         // The transaction re-reads both documents on the server, so if two
         // players tap the same order at once only the first write wins.
         // Transactions need a connection; the timeout turns a hang into a message.
-        return await withTimeout(
+        const result = await withTimeout(
           runTransaction(db, async (transaction): Promise<ClaimResult> => {
             const [order, player] = await Promise.all([transaction.get(orderRef(orderId)), transaction.get(playerRef)]);
+            // Already ours: an earlier attempt went through but its reply was
+            // lost (flaky network), and Firestore ran the transaction again.
+            if (order.exists() && order.data().uid === uid) return { ok: true };
             if (order.exists()) return { ok: false, reason: "taken" };
             if (player.exists()) {
               return { ok: false, reason: "already-has-order", orderId: String(player.data().orderId) };
@@ -207,8 +231,15 @@ const createFirebaseBackend = async (): Promise<ClaimsBackend> => {
             transaction.set(playerRef, { name: shipper, orderId, claimedAt: serverTimestamp() });
             return { ok: true };
           }),
-          12000,
+          // Generous: with a crowd tapping at once, Firestore retries contended
+          // transactions, which can take several seconds on a phone network.
+          20000,
         );
+        if (result.ok && !serverClaims[orderId]) {
+          justClaimed[orderId] = { status: "delivering", shipper, mine: true, claimedAt: Date.now() };
+          emit();
+        }
+        return result;
       } catch (error) {
         // A rules rejection means someone beat us to it; anything else is connectivity.
         const code = (error as { code?: string }).code;
@@ -218,9 +249,15 @@ const createFirebaseBackend = async (): Promise<ClaimsBackend> => {
     deliver(orderId) {
       // Firestore applies this locally straight away (the order list updates
       // even offline) and sends it when the connection is back.
+      const pending = justClaimed[orderId];
+      if (pending) {
+        justClaimed[orderId] = { ...pending, status: "delivered" };
+        emit();
+      }
       return updateDoc(orderRef(orderId), { status: "delivered", deliveredAt: serverTimestamp() });
     },
     async release(orderId) {
+      delete justClaimed[orderId];
       const batch = writeBatch(db);
       batch.delete(orderRef(orderId));
       batch.delete(playerRef);

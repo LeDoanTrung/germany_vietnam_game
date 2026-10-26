@@ -10,7 +10,7 @@ import { claimOf, statusOf, useGame } from "../store/game";
 import { sounds } from "../composables/useSound";
 import { prefersReducedMotion } from "../composables/useReducedMotion";
 
-const { availableOrders, myOrder, earnings, back, openOrder } = useGame();
+const { availableOrders, myOrder, earnings, back, openOrder, showNotice } = useGame();
 
 const takenByOther = (id: string) => statusOf(id) !== "available" && !claimOf(id)?.mine;
 
@@ -69,7 +69,14 @@ const drawRandom = () => {
     window.setTimeout(() => {
       drawing.value = false;
       highlightedId.value = null;
-      openOrder(winner);
+      // With many players drawing at once, the winner may have been taken
+      // while the wheel was spinning: land on one that's still free instead.
+      const stillFree = availableOrders.value.map((order) => order.id);
+      if (stillFree.length === 0) {
+        showNotice("All orders were just taken.");
+        return;
+      }
+      openOrder(stillFree.includes(winner) ? winner : stillFree[Math.floor(Math.random() * stillFree.length)]!);
     }, elapsed + 1100),
   );
 };

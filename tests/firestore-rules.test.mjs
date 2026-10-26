@@ -39,6 +39,7 @@ const playerRef = (db, uid) => doc(db, "rounds", ROUND, "players", uid);
 const claim = (db, uid, orderId, shipper) =>
   runTransaction(db, async (tx) => {
     const [order, player] = await Promise.all([tx.get(orderRef(db, orderId)), tx.get(playerRef(db, uid))]);
+    if (order.exists() && order.data().uid === uid) return "ok"; // a retry of our own win
     if (order.exists()) return "taken";
     if (player.exists()) return "already-has-order";
     tx.set(orderRef(db, orderId), { status: "delivering", shipper, uid, claimedAt: serverTimestamp() });

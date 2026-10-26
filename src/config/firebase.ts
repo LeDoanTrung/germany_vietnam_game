@@ -16,8 +16,9 @@ export const FIREBASE_CONFIG = {
 /**
  * Orders are stored under this round. To reset the game for a new group,
  * change it (and redeploy) or delete the round in the Firebase console.
+ * VITE_ROUND_ID points a test build at a throwaway round instead.
  */
-export const ROUND_ID = "phd-workshop-2026";
+export const ROUND_ID = import.meta.env.VITE_ROUND_ID || "phd-workshop-2026";
 
 /**
  * `VITE_FORCE_LOCAL=1 npm run dev` runs the game in local mode even though
