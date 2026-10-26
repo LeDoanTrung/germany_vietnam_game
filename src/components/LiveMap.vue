@@ -259,11 +259,8 @@ const recenter = () => {
     background: #0b1730;
     z-index: 0;
 
-    // Dark tiles to match the hologram UI: invert the standard OSM style,
-    // then rotate the hues back so water stays blue and parks green.
-    :deep(.leaflet-tile-pane) {
-      filter: invert(1) hue-rotate(180deg) brightness(0.95) saturate(0.6) contrast(0.9);
-    }
+    // Plain, light OSM tiles. They used to be inverted with a CSS filter to look
+    // dark, but iPhones can paint a filtered map layer this big as solid white.
 
     :deep(.leaflet-control-attribution) {
       background: rgba(2, 10, 28, 0.7);
